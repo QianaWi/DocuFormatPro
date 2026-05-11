@@ -1,0 +1,147 @@
+Sub UpdateCaptionsNoBleed()
+    Dim doc As Document: Set doc = ActiveDocument
+    Dim tbl As Table: Dim ishape As InlineShape
+    Dim tocEnd As Long: Dim currentHeading As String
+    Dim lastHeading As String: Dim iCount As Integer
+    
+    ' 保护目录
+    If doc.TablesOfContents.Count > 0 Then tocEnd = doc.TablesOfContents(doc.TablesOfContents.Count).Range.End Else tocEnd = 0
+
+    ' 初始化正则表达式
+    Dim regEx As Object: Set regEx = CreateObject("VBScript.RegExp")
+    regEx.Pattern = "^表[\s\xA0]*[\d\.\-]+[\s\xA0]*"
+    
+    ' ==========================================
+    ' 1. 处理表格
+    ' ==========================================
+    lastHeading = ""
+    For Each tbl In doc.Tables
+        If tbl.Range.Start > tocEnd Then
+            currentHeading = GetHeadingNum(tbl.Range)
+            If currentHeading <> lastHeading Then iCount = 1: lastHeading = currentHeading Else iCount = iCount + 1
+            
+            Dim pTarget As Paragraph: Set pTarget = tbl.Range.Paragraphs(1).Previous
+            Dim hasCaption As Boolean: hasCaption = False
+            Dim oldText As String: oldText = ""
+            
+            If Not pTarget Is Nothing Then
+                Dim rawText As String: rawText = pTarget.Range.Text
+                rawText = Replace(Replace(rawText, Chr(13), ""), Chr(7), "")
+                rawText = Replace(rawText, Chr(160), " ") ' 将特殊空格转为普通空格
+                rawText = Trim(rawText)
+                
+                If Left(rawText, 1) = "表" Then
+                    hasCaption = True
+                    If regEx.Test(rawText) Then
+                        oldText = Trim(regEx.Replace(rawText, ""))
+                    Else
+                        Dim spacePos As Integer: spacePos = InStr(1, rawText, " ")
+                        If spacePos > 0 Then oldText = Trim(Mid(rawText, spacePos + 1))
+                    End If
+                End If
+            End If
+            
+            If Not hasCaption Then
+                tbl.Range.InsertParagraphBefore
+                Set pTarget = tbl.Range.Paragraphs(1).Previous
+            End If
+            
+            ' 【终极绝招：使用 @@@ 占位符先生成纯文本，绝对隔离域边界】
+            Dim rClear As Range: Set rClear = pTarget.Range
+            rClear.MoveEnd wdCharacter, -1
+            If Len(oldText) > 0 Then
+                ' 注意这里 @@@ 后面有一个极其关键的普通空格
+                rClear.Text = "表 " & currentHeading & "-@@@ " & oldText
+            Else
+                rClear.Text = "表 " & currentHeading & "-@@@"
+            End If
+            
+            ' 只把 @@@ 替换为序号域，后面的文字绝不会被卷入域中
+            Dim rFind As Range: Set rFind = pTarget.Range
+            If rFind.Find.Execute(FindText:="@@@") Then
+                doc.Fields.Add Range:=rFind, Type:=wdFieldSequence, Text:="表 \r " & iCount, PreserveFormatting:=False
+            End If
+            
+            pTarget.Alignment = wdAlignParagraphCenter
+            pTarget.Style = "题注"
+        End If
+    Next tbl
+
+    ' ==========================================
+    ' 2. 处理图片
+    ' ==========================================
+    Dim regExFig As Object: Set regExFig = CreateObject("VBScript.RegExp")
+    regExFig.Pattern = "^图[\s\xA0]*[\d\.\-]+[\s\xA0]*"
+    
+    lastHeading = ""
+    For Each ishape In doc.InlineShapes
+        If ishape.Range.Start > tocEnd Then
+            currentHeading = GetHeadingNum(ishape.Range)
+            If currentHeading <> lastHeading Then iCount = 1: lastHeading = currentHeading Else iCount = iCount + 1
+            
+            Dim pFigTarget As Paragraph: Set pFigTarget = ishape.Range.Paragraphs(1).Next
+            Dim hasFigCaption As Boolean: hasFigCaption = False
+            Dim oldFigText As String: oldFigText = ""
+            
+            If Not pFigTarget Is Nothing Then
+                Dim rawFigText As String: rawFigText = pFigTarget.Range.Text
+                rawFigText = Replace(Replace(rawFigText, Chr(13), ""), Chr(7), "")
+                rawFigText = Replace(rawFigText, Chr(160), " ")
+                rawFigText = Trim(rawFigText)
+                
+                If Left(rawFigText, 1) = "图" Then
+                    hasFigCaption = True
+                    If regExFig.Test(rawFigText) Then
+                        oldFigText = Trim(regExFig.Replace(rawFigText, ""))
+                    Else
+                        Dim spaceFigPos As Integer: spaceFigPos = InStr(1, rawFigText, " ")
+                        If spaceFigPos > 0 Then oldFigText = Trim(Mid(rawFigText, spaceFigPos + 1))
+                    End If
+                End If
+            End If
+            
+            If Not hasFigCaption Then
+                ishape.Range.Paragraphs(1).Range.InsertParagraphAfter
+                Set pFigTarget = ishape.Range.Paragraphs(1).Next
+            End If
+            
+            Dim rFigClear As Range: Set rFigClear = pFigTarget.Range
+            rFigClear.MoveEnd wdCharacter, -1
+            If Len(oldFigText) > 0 Then
+                rFigClear.Text = "图 " & currentHeading & "-@@@ " & oldFigText
+            Else
+                rFigClear.Text = "图 " & currentHeading & "-@@@"
+            End If
+            
+            Dim rFigFind As Range: Set rFigFind = pFigTarget.Range
+            If rFigFind.Find.Execute(FindText:="@@@") Then
+                doc.Fields.Add Range:=rFigFind, Type:=wdFieldSequence, Text:="图 \r " & iCount, PreserveFormatting:=False
+            End If
+            
+            pFigTarget.Alignment = wdAlignParagraphCenter
+            pFigTarget.Style = "题注"
+        End If
+    Next ishape
+    
+    ' 全局更新一次域代码
+    doc.Fields.Update
+    MsgBox "题注深度重构完成！请尝试重新插入交叉引用测试。", vbInformation
+End Sub
+
+' ---------------------------------------------------------
+' 核心函数：获取章节编号
+' ---------------------------------------------------------
+Function GetHeadingNum(r As Range) As String
+    Dim p As Paragraph: Set p = r.Paragraphs(1).Previous
+    Do While Not p Is Nothing
+        If p.Style Like "标题 *" Or p.Style Like "Heading *" Then
+            Dim h As String: h = Trim(p.Range.ListFormat.ListString)
+            If h <> "" Then
+                If Right(h, 1) = "." Then h = Left(h, Len(h) - 1)
+                GetHeadingNum = h: Exit Function
+            End If
+        End If
+        Set p = p.Previous
+    Loop
+    GetHeadingNum = "0"
+End Function
