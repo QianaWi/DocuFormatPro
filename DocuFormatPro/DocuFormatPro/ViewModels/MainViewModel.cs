@@ -19,6 +19,9 @@ namespace DocuFormatPro.ViewModels
         private readonly RuleStorageService _ruleStorage;
         private CancellationTokenSource? _cts;
 
+        /// <summary>排版前确认回调，由 View 层注入；返回 false 则取消处理</summary>
+        public Func<FormattingRule, int, bool>? ConfirmBeforeProcessing { get; set; }
+
         private bool _isProcessing;
         private double _progressValue;
         private string _statusText = "就绪 — 拖拽 Word 文档到窗口中开始";
@@ -214,6 +217,13 @@ namespace DocuFormatPro.ViewModels
         private async Task StartProcessingAsync()
         {
             if (FileItems.Count == 0) return;
+
+            // 弹出二次确认对话框
+            if (ConfirmBeforeProcessing != null)
+            {
+                bool confirmed = ConfirmBeforeProcessing(CurrentRule, FileItems.Count);
+                if (!confirmed) return;
+            }
 
             IsProcessing = true;
             ProgressValue = 0;

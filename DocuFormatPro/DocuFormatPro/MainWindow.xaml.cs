@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using DocuFormatPro.Models;
 using DocuFormatPro.ViewModels;
+using DocuFormatPro.Views;
 
 namespace DocuFormatPro
 {
@@ -15,6 +16,16 @@ namespace DocuFormatPro
             InitializeComponent();
             _viewModel = new MainViewModel();
             DataContext = _viewModel;
+
+            // 注入排版前确认对话框
+            _viewModel.ConfirmBeforeProcessing = (rule, fileCount) =>
+            {
+                var dialog = new ConfirmFormattingDialog(rule, fileCount)
+                {
+                    Owner = this
+                };
+                return dialog.ShowDialog() == true;
+            };
         }
 
         private void Window_DragEnter(object sender, DragEventArgs e)
