@@ -163,4 +163,33 @@ namespace DocuFormatPro.Converters
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotImplementedException();
     }
+
+    /// <summary>
+    /// 十六进制颜色字符串（#RRGGBB）→ SolidColorBrush 转换器，用于颜色预览色块
+    /// </summary>
+    public class HexColorToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string hex)
+            {
+                try
+                {
+                    hex = hex.TrimStart('#');
+                    if (hex.Length == 6)
+                    {
+                        byte r = System.Convert.ToByte(hex.Substring(0, 2), 16);
+                        byte g = System.Convert.ToByte(hex.Substring(2, 2), 16);
+                        byte b = System.Convert.ToByte(hex.Substring(4, 2), 16);
+                        return new SolidColorBrush(Color.FromRgb(r, g, b));
+                    }
+                }
+                catch { }
+            }
+            return new SolidColorBrush(Colors.Black);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
 }

@@ -164,7 +164,19 @@ namespace DocuFormatPro.ViewModels
         {
             string ext = Path.GetExtension(filePath).ToLowerInvariant();
             if (ext != ".doc" && ext != ".docx") return;
-            if (FileItems.Any(f => f.FilePath == filePath)) return;
+
+            var existing = FileItems.FirstOrDefault(f => f.FilePath == filePath);
+            if (existing != null)
+            {
+                // 终态（Completed/Failed）条目重置为 Queued，允许重新处理
+                // 活跃态（Queued/Processing）保持不变，避免干扰进行中的任务
+                if (existing.Status == FileStatus.Completed || existing.Status == FileStatus.Failed)
+                {
+                    existing.Status = FileStatus.Queued;
+                    existing.StatusMessage = "排队中";
+                }
+                return;
+            }
 
             var fi = new FileInfo(filePath);
             FileItems.Add(new FileItem

@@ -10,7 +10,6 @@ namespace DocuFormatPro.Services
     /// </summary>
     public class WordProcessingService : IDisposable
     {
-        private Application? _wordApp;
         private bool _disposed;
 
         /// <summary>
@@ -24,17 +23,28 @@ namespace DocuFormatPro.Services
         {
             await System.Threading.Tasks.Task.Run(() =>
             {
+                Exception? threadException = null;
+
                 var thread = new Thread(() =>
                 {
+                    Application? wordApp = null;
                     Document? doc = null;
                     try
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        EnsureWordApplication();
+
+                        // 每次处理在当前 STA 线程内创建独立的 Word Application 实例
+                        // 避免跨线程复用 RCW 导致 "COM object that has been separated from its underlying RCW" 错误
+                        wordApp = new Application
+                        {
+                            Visible = false,
+                            ScreenUpdating = false,
+                            DisplayAlerts = WdAlertLevel.wdAlertsNone
+                        };
 
                         progress?.Report($"正在打开文档: {System.IO.Path.GetFileName(filePath)}");
 
-                        doc = _wordApp!.Documents.Open(
+                        doc = wordApp.Documents.Open(
                             FileName: filePath,
                             ReadOnly: false,
                             Visible: false);
@@ -43,7 +53,7 @@ namespace DocuFormatPro.Services
 
                         // ===== 1. 设置页边距 =====
                         progress?.Report("正在标准化页边距...");
-                        SetPageMargins(doc, rule);
+                        SetPageMargins(wordApp, doc, rule);
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 2. 设置正文样式 =====
@@ -62,9 +72,12 @@ namespace DocuFormatPro.Services
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 5. 格式化表格 =====
-                        progress?.Report("正在重塑表格...");
-                        FormatAllTables(doc, rule);
-                        cancellationToken.ThrowIfCancellationRequested();
+                        if (rule.Table.ApplyTableFormatting)
+                        {
+                            progress?.Report("正在重塑表格...");
+                            FormatAllTables(doc, rule);
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
 
                         // ===== 6. 清除所有文字背景色 =====
                         progress?.Report("正在清除文字背景色...");
@@ -72,16 +85,19 @@ namespace DocuFormatPro.Services
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 7. 处理表格和图片题注 =====
-                        progress?.Report("正在处理题注...");
-                        var captionService = new CaptionService();
-                        captionService.ProcessCaptions(doc, progress);
-                        cancellationToken.ThrowIfCancellationRequested();
+                        if (rule.Table.ApplyTableCaptions)
+                        {
+                            progress?.Report("正在处理题注...");
+                            var captionService = new CaptionService();
+                            captionService.ProcessCaptions(doc, progress);
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
 
                         // ===== 8. 插入前置页 =====
                         if (rule.FrontMatter.InsertFrontMatter && !string.IsNullOrWhiteSpace(rule.FrontMatter.TemplateFilePath))
                         {
                             progress?.Report("正在插入封面与前置页...");
-                            InsertFrontMatterPages(doc, rule.FrontMatter.TemplateFilePath);
+                            InsertFrontMatterPages(wordApp, doc, rule.FrontMatter.TemplateFilePath);
                             cancellationToken.ThrowIfCancellationRequested();
                         }
 
@@ -99,12 +115,12 @@ namespace DocuFormatPro.Services
                     catch (OperationCanceledException)
                     {
                         progress?.Report("操作已取消");
-                        throw;
+                        threadException = new OperationCanceledException();
                     }
                     catch (Exception ex)
                     {
-                        progress?.Report($"处理失败: {ex.Message}");
-                        throw;
+                        progress?.Report($"处理失败: {ex.Message}\n{ex.StackTrace}");
+                        threadException = ex;
                     }
                     finally
                     {
@@ -117,6 +133,16 @@ namespace DocuFormatPro.Services
                                 doc = null;
                             }
                         }
+
+                        if (wordApp != null)
+                        {
+                            try { wordApp.Quit(WdSaveOptions.wdDoNotSaveChanges); } catch { }
+                            finally
+                            {
+                                Marshal.ReleaseComObject(wordApp);
+                                wordApp = null;
+                            }
+                        }
                     }
                 });
 
@@ -124,37 +150,27 @@ namespace DocuFormatPro.Services
                 thread.Start();
                 thread.Join();
 
-            }, cancellationToken);
-        }
+                // 将 STA 线程内的异常传递到调用方，确保失败状态能被正确标记
+                if (threadException is OperationCanceledException)
+                    throw new OperationCanceledException();
+                if (threadException != null)
+                    throw new Exception(threadException.Message, threadException);
 
-        /// <summary>
-        /// 确保 Word 应用已启动
-        /// </summary>
-        private void EnsureWordApplication()
-        {
-            if (_wordApp == null)
-            {
-                _wordApp = new Application
-                {
-                    Visible = false,
-                    ScreenUpdating = false,
-                    DisplayAlerts = WdAlertLevel.wdAlertsNone
-                };
-            }
+            }, cancellationToken);
         }
 
         #region 排版实现
 
         /// <summary>设置页边距</summary>
-        private void SetPageMargins(Document doc, FormattingRule rule)
+        private void SetPageMargins(Application wordApp, Document doc, FormattingRule rule)
         {
             foreach (Section section in doc.Sections)
             {
                 var ps = section.PageSetup;
-                ps.TopMargin = _wordApp!.CentimetersToPoints(rule.PageMargins.TopMargin);
-                ps.BottomMargin = _wordApp.CentimetersToPoints(rule.PageMargins.BottomMargin);
-                ps.LeftMargin = _wordApp.CentimetersToPoints(rule.PageMargins.LeftMargin);
-                ps.RightMargin = _wordApp.CentimetersToPoints(rule.PageMargins.RightMargin);
+                ps.TopMargin = wordApp.CentimetersToPoints(rule.PageMargins.TopMargin);
+                ps.BottomMargin = wordApp.CentimetersToPoints(rule.PageMargins.BottomMargin);
+                ps.LeftMargin = wordApp.CentimetersToPoints(rule.PageMargins.LeftMargin);
+                ps.RightMargin = wordApp.CentimetersToPoints(rule.PageMargins.RightMargin);
             }
         }
 
@@ -171,7 +187,9 @@ namespace DocuFormatPro.Services
                 normalStyle.Font.NameOther = rule.BodyText.ChineseFontName;
                 normalStyle.Font.Size = rule.BodyText.FontSizePoint;
                 normalStyle.Font.Bold = rule.BodyText.IsBold ? -1 : 0;
-                normalStyle.Font.Color = WdColor.wdColorBlack;
+                normalStyle.Font.Color = rule.BodyText.UseCustomFontColor
+                    ? ParseHexToWdColor(rule.BodyText.FontColorHex)
+                    : WdColor.wdColorBlack;
 
                 // 段落格式
                 var pf = normalStyle.ParagraphFormat;
@@ -196,8 +214,12 @@ namespace DocuFormatPro.Services
                 { 3, WdBuiltinStyle.wdStyleHeading3 }
             };
 
+            if (rule.Headings == null) return;
+
             foreach (var heading in rule.Headings)
             {
+                if (heading == null) continue;
+
                 if (!builtinMap.TryGetValue(heading.Level, out var builtinStyle))
                     continue;
 
@@ -211,7 +233,9 @@ namespace DocuFormatPro.Services
                     style.Font.NameOther = heading.ChineseFontName;
                     style.Font.Size = heading.FontSizePoint;
                     style.Font.Bold = heading.IsBold ? -1 : 0;
-                    style.Font.Color = WdColor.wdColorBlack;
+                    style.Font.Color = heading.UseCustomFontColor
+                        ? ParseHexToWdColor(heading.FontColorHex)
+                        : WdColor.wdColorBlack;
 
                     // 对齐
                     style.ParagraphFormat.Alignment = heading.Alignment switch
@@ -254,7 +278,9 @@ namespace DocuFormatPro.Services
                         range.Font.NameAscii = rule.BodyText.EnglishFontName;
                         range.Font.Size = rule.BodyText.FontSizePoint;
                         range.Font.Bold = rule.BodyText.IsBold ? -1 : 0;
-                        range.Font.Color = WdColor.wdColorBlack;
+                        range.Font.Color = rule.BodyText.UseCustomFontColor
+                            ? ParseHexToWdColor(rule.BodyText.FontColorHex)
+                            : WdColor.wdColorBlack;
 
                         bool isInTable = false;
                         try { isInTable = (bool)range.Information[WdInformation.wdWithInTable]; } catch { }
@@ -278,7 +304,7 @@ namespace DocuFormatPro.Services
             }
         }
 
-        /// <summary>清除所有文字的背景色（高亮和底纹）</summary>
+        /// <summary>清除所有文字的背景色（高亮和底纹），并逐个清除表格单元格背景</summary>
         private void ClearAllTextBackground(Document doc)
         {
             try
@@ -286,12 +312,31 @@ namespace DocuFormatPro.Services
                 // 清除全文高亮
                 doc.Content.HighlightColorIndex = WdColorIndex.wdNoHighlight;
 
-                // 清除全文底纹
+                // 清除全文底纹（对正文段落有效，但对表格单元格可能产生混合状态）
                 doc.Content.Shading.Texture = WdTextureIndex.wdTextureNone;
                 doc.Content.Shading.BackgroundPatternColor = WdColor.wdColorWhite;
                 doc.Content.Shading.ForegroundPatternColor = WdColor.wdColorWhite;
             }
             catch { }
+
+            // 逐个单元格清除背景色，避免 doc.Content.Shading 对表格产生脏状态
+            foreach (Table table in doc.Tables)
+            {
+                try
+                {
+                    foreach (Cell cell in table.Range.Cells)
+                    {
+                        try
+                        {
+                            cell.Shading.Texture = WdTextureIndex.wdTextureNone;
+                            cell.Shading.BackgroundPatternColor = WdColor.wdColorWhite;
+                            cell.Shading.ForegroundPatternColor = WdColor.wdColorWhite;
+                        }
+                        catch { continue; }
+                    }
+                }
+                catch { continue; }
+            }
         }
 
         /// <summary>格式化所有表格</summary>
@@ -335,13 +380,10 @@ namespace DocuFormatPro.Services
                                 cell.Range.Font.NameAscii = rule.BodyText.EnglishFontName;
                                 cell.Range.Font.Size = rule.BodyText.FontSizePoint;
                                 cell.Range.Font.Bold = 0; // 默认不加粗
-                                cell.Range.Font.Color = WdColor.wdColorBlack;
+                                cell.Range.Font.Color = rule.BodyText.UseCustomFontColor
+                                    ? ParseHexToWdColor(rule.BodyText.FontColorHex)
+                                    : WdColor.wdColorBlack;
                             }
-
-                            // 清除单元格背景填充颜色
-                            cell.Shading.Texture = WdTextureIndex.wdTextureNone;
-                            cell.Shading.BackgroundPatternColor = WdColor.wdColorWhite;
-                            cell.Shading.ForegroundPatternColor = WdColor.wdColorWhite;
 
                             // 段落格式
                             cell.Range.ParagraphFormat.SpaceBefore = rule.Table.SpaceBeforeLines * 12f;
@@ -453,19 +495,40 @@ namespace DocuFormatPro.Services
             }
         }
 
+        /// <summary>将十六进制颜色字符串转换为 WdColor（Word COM 使用 BGR 格式）</summary>
+        private WdColor ParseHexToWdColor(string? hex)
+        {
+            if (string.IsNullOrWhiteSpace(hex)) return WdColor.wdColorBlack;
+
+            try
+            {
+                string cleanHex = hex.Trim().TrimStart('#');
+                if (cleanHex.Length == 6)
+                {
+                    int r = Convert.ToInt32(cleanHex.Substring(0, 2), 16);
+                    int g = Convert.ToInt32(cleanHex.Substring(2, 2), 16);
+                    int b = Convert.ToInt32(cleanHex.Substring(4, 2), 16);
+                    // Word COM 使用 BGR 格式: (B << 16) | (G << 8) | R
+                    return (WdColor)((b << 16) | (g << 8) | r);
+                }
+            }
+            catch { }
+            return WdColor.wdColorBlack;
+        }
+
         #endregion
 
         #region 前置页处理
 
         /// <summary>从模板提取前4页并插入到目标文档开头</summary>
-        private void InsertFrontMatterPages(Document targetDoc, string templatePath)
+        private void InsertFrontMatterPages(Application wordApp, Document targetDoc, string templatePath)
         {
             if (!System.IO.File.Exists(templatePath)) return;
 
             Document? templateDoc = null;
             try
             {
-                templateDoc = _wordApp!.Documents.Open(
+                templateDoc = wordApp.Documents.Open(
                     FileName: templatePath,
                     ReadOnly: true,
                     Visible: false);
@@ -522,15 +585,8 @@ namespace DocuFormatPro.Services
         {
             if (!_disposed)
             {
-                if (_wordApp != null)
-                {
-                    try { _wordApp.Quit(WdSaveOptions.wdDoNotSaveChanges); } catch { }
-                    finally
-                    {
-                        Marshal.ReleaseComObject(_wordApp);
-                        _wordApp = null;
-                    }
-                }
+                // Word Application 实例由每次 ProcessDocumentAsync 在 STA 线程内独立创建并释放，
+                // 这里不再持有跨调用的 COM 引用
                 _disposed = true;
             }
         }

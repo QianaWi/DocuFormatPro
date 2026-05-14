@@ -123,6 +123,10 @@
                                     </StackPanel>
                                 </UniformGrid>
                                 <CheckBox Content="加粗" IsChecked="{Binding CurrentRule.BodyText.IsBold}" Style="{StaticResource RuleCheckBoxStyle}" Margin="0,6,0,0"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <CheckBox Content="设置字体颜色" IsChecked="{Binding CurrentRule.BodyText.UseCustomFontColor}" Style="{StaticResource RuleCheckBoxStyle}" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding CurrentRule.BodyText.FontColorHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="80" Margin="8,0,0,0" IsEnabled="{Binding CurrentRule.BodyText.UseCustomFontColor}" VerticalAlignment="Center"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -190,6 +194,10 @@
                                                             <CheckBox Content="加粗" IsChecked="{Binding IsBold}" FontSize="11" Margin="0,14,0,0"/>
                                                         </StackPanel>
                                                     </UniformGrid>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                        <CheckBox Content="设置颜色" IsChecked="{Binding UseCustomFontColor}" FontSize="11" VerticalAlignment="Center"/>
+                                                        <TextBox Text="{Binding FontColorHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="75" Height="26" FontSize="11" Margin="8,0,0,0" IsEnabled="{Binding UseCustomFontColor}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </Expander>
                                         </DataTemplate>
@@ -202,6 +210,9 @@
                         <Border Style="{StaticResource RuleGroupCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="表格格式" Style="{StaticResource RuleGroupTitleStyle}"/>
+                                <CheckBox Content="应用表格样式" IsChecked="{Binding CurrentRule.Table.ApplyTableFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <CheckBox Content="自动处理题注编号" IsChecked="{Binding CurrentRule.Table.ApplyTableCaptions}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <StackPanel IsEnabled="{Binding CurrentRule.Table.ApplyTableFormatting}">
                                 <CheckBox Content="字体与正文一致" IsChecked="{Binding CurrentRule.Table.UseSameAsBody}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <CheckBox Content="表头加粗" IsChecked="{Binding CurrentRule.Table.HeaderBold}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <CheckBox Content="跨页重复表头" IsChecked="{Binding CurrentRule.Table.RepeatHeaderRow}" Style="{StaticResource RuleCheckBoxStyle}"/>
@@ -215,6 +226,7 @@
                                         <TextBox Text="黑色单细线" Style="{StaticResource RuleTextBoxStyle}" IsReadOnly="True"/>
                                     </StackPanel>
                                 </UniformGrid>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 

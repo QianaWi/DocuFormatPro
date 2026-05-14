@@ -192,12 +192,18 @@ namespace DocuFormatPro.Models
         private float _fontSizePoint = 12f;
         private string _fontSizeName = "小四";
         private bool _isBold;
+        private bool _useCustomFontColor = false;
+        private string _fontColorHex = "#000000";
 
         public string ChineseFontName { get => _chineseFontName; set { _chineseFontName = value; OnPropertyChanged(); } }
         public string EnglishFontName { get => _englishFontName; set { _englishFontName = value; OnPropertyChanged(); } }
         public float FontSizePoint { get => _fontSizePoint; set { _fontSizePoint = value; OnPropertyChanged(); } }
         public string FontSizeName { get => _fontSizeName; set { _fontSizeName = value; OnPropertyChanged(); } }
         public bool IsBold { get => _isBold; set { _isBold = value; OnPropertyChanged(); } }
+        /// <summary>是否启用自定义字体颜色</summary>
+        public bool UseCustomFontColor { get => _useCustomFontColor; set { _useCustomFontColor = value; OnPropertyChanged(); } }
+        /// <summary>字体颜色（十六进制，如 #000000）</summary>
+        public string FontColorHex { get => _fontColorHex; set { _fontColorHex = value; OnPropertyChanged(); } }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
@@ -227,6 +233,8 @@ namespace DocuFormatPro.Models
     /// <summary>表格格式设置</summary>
     public class TableSettings : INotifyPropertyChanged
     {
+        private bool _applyTableFormatting = true;
+        private bool _applyTableCaptions = true;
         private bool _useSameAsBody = true;
         private bool _headerBold = true;
         private float _spaceBeforeLines;
@@ -239,6 +247,10 @@ namespace DocuFormatPro.Models
         private CellHorizontalAlign _cellHorizontalAlignment = CellHorizontalAlign.Center;
         private bool _repeatHeaderRow = true;
 
+        /// <summary>是否应用表格样式格式化</summary>
+        public bool ApplyTableFormatting { get => _applyTableFormatting; set { _applyTableFormatting = value; OnPropertyChanged(); } }
+        /// <summary>是否自动处理表格和图片题注</summary>
+        public bool ApplyTableCaptions { get => _applyTableCaptions; set { _applyTableCaptions = value; OnPropertyChanged(); } }
         /// <summary>字体是否与正文一致</summary>
         public bool UseSameAsBody { get => _useSameAsBody; set { _useSameAsBody = value; OnPropertyChanged(); } }
         /// <summary>表头行加粗</summary>
@@ -273,6 +285,8 @@ namespace DocuFormatPro.Models
         private float _spaceAfterLines = 0.5f;
         private LineSpacingType _lineSpacingType = LineSpacingType.Multiple;
         private float _lineSpacingValue = 1.4f;
+        private bool _useCustomFontColor = false;
+        private string _fontColorHex = "#000000";
 
         public int Level { get => _level; set { _level = value; OnPropertyChanged(); } }
         public string ChineseFontName { get => _chineseFontName; set { _chineseFontName = value; OnPropertyChanged(); } }
@@ -285,6 +299,10 @@ namespace DocuFormatPro.Models
         public float SpaceAfterLines { get => _spaceAfterLines; set { _spaceAfterLines = value; OnPropertyChanged(); } }
         public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); } }
         public float LineSpacingValue { get => _lineSpacingValue; set { _lineSpacingValue = value; OnPropertyChanged(); } }
+        /// <summary>是否启用自定义字体颜色</summary>
+        public bool UseCustomFontColor { get => _useCustomFontColor; set { _useCustomFontColor = value; OnPropertyChanged(); } }
+        /// <summary>字体颜色（十六进制，如 #000000）</summary>
+        public string FontColorHex { get => _fontColorHex; set { _fontColorHex = value; OnPropertyChanged(); } }
 
         /// <summary>显示名称（用于 UI）</summary>
         [JsonIgnore]
