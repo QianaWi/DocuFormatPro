@@ -159,50 +159,75 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- HEADINGS (Expanders) -->
+                        <!-- HEADINGS -->
                         <Border Style="{StaticResource RuleGroupCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="标题格式" Style="{StaticResource RuleGroupTitleStyle}"/>
-                                <ItemsControl ItemsSource="{Binding CurrentRule.Headings}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Expander Style="{StaticResource HeadingExpanderStyle}" IsExpanded="False">
-                                                <Expander.Header>
-                                                    <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="Medium"/>
-                                                </Expander.Header>
-                                                <StackPanel Margin="0,6,0,4">
-                                                    <UniformGrid Columns="2">
-                                                        <StackPanel Margin="0,0,4,4">
-                                                            <TextBlock Text="中文字体" FontSize="10" Foreground="#9CA3AF" Margin="0,0,0,2"/>
-                                                            <TextBox Text="{Binding ChineseFontName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
-                                                        </StackPanel>
-                                                        <StackPanel Margin="4,0,0,4">
-                                                            <TextBlock Text="英文字体" FontSize="10" Foreground="#9CA3AF" Margin="0,0,0,2"/>
-                                                            <TextBox Text="{Binding EnglishFontName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
-                                                        </StackPanel>
-                                                    </UniformGrid>
-                                                    <UniformGrid Columns="3">
-                                                        <StackPanel Margin="0,0,4,4">
-                                                            <TextBlock Text="字号" FontSize="10" Foreground="#9CA3AF" Margin="0,0,0,2"/>
-                                                            <TextBox Text="{Binding FontSizeName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
-                                                        </StackPanel>
-                                                        <StackPanel Margin="4,0,4,4">
-                                                            <TextBlock Text="磅值" FontSize="10" Foreground="#9CA3AF" Margin="0,0,0,2"/>
-                                                            <TextBox Text="{Binding FontSizePoint, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
-                                                        </StackPanel>
-                                                        <StackPanel Margin="4,0,0,4">
-                                                            <CheckBox Content="加粗" IsChecked="{Binding IsBold}" FontSize="11" Margin="0,14,0,0"/>
-                                                        </StackPanel>
-                                                    </UniformGrid>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                        <CheckBox Content="设置颜色" IsChecked="{Binding UseCustomFontColor}" FontSize="11" VerticalAlignment="Center"/>
-                                                        <TextBox Text="{Binding FontColorHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="75" Height="26" FontSize="11" Margin="8,0,0,0" IsEnabled="{Binding UseCustomFontColor}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Expander>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <!-- 列标题 -->
+                                <Grid Margin="0,4,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="1" Text="中文字体" FontSize="10" Foreground="#9CA3AF"/>
+                                    <TextBlock Grid.Column="3" Text="字号" FontSize="10" Foreground="#9CA3AF"/>
+                                </Grid>
+                                <!-- 标题 1 -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="标题 1" FontSize="11.5" Foreground="#374151" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding HeadingChineseFontNames}"
+                                              SelectedItem="{Binding CurrentRule.Headings[0].ChineseFontName}"
+                                              Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11"/>
+                                    <ComboBox Grid.Column="3" ItemsSource="{Binding FontSizeNames}"
+                                              SelectedItem="{Binding CurrentRule.Headings[0].FontSizeName}"
+                                              Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11"
+                                              Tag="1" SelectionChanged="HeadingFontSize_Changed"/>
+                                </Grid>
+                                <!-- 标题 2 -->
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="标题 2" FontSize="11.5" Foreground="#374151" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding HeadingChineseFontNames}"
+                                              SelectedItem="{Binding CurrentRule.Headings[1].ChineseFontName}"
+                                              Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11"/>
+                                    <ComboBox Grid.Column="3" ItemsSource="{Binding FontSizeNames}"
+                                              SelectedItem="{Binding CurrentRule.Headings[1].FontSizeName}"
+                                              Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11"
+                                              Tag="2" SelectionChanged="HeadingFontSize_Changed"/>
+                                </Grid>
+                                <!-- 标题 3 -->
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="标题 3" FontSize="11.5" Foreground="#374151" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding HeadingChineseFontNames}"
+                                              SelectedItem="{Binding CurrentRule.Headings[2].ChineseFontName}"
+                                              Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11"/>
+                                    <ComboBox Grid.Column="3" ItemsSource="{Binding FontSizeNames}"
+                                              SelectedItem="{Binding CurrentRule.Headings[2].FontSizeName}"
+                                              Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11"
+                                              Tag="3" SelectionChanged="HeadingFontSize_Changed"/>
+                                </Grid>
+                                <!-- 固定参数说明 -->
+                                <TextBlock Text="英文字体：Times New Roman  ·  段前/段后：6pt  ·  行距：1.4倍"
+                                           FontSize="9.5" Foreground="#9CA3AF" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
 

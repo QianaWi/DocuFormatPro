@@ -204,7 +204,7 @@ namespace DocuFormatPro.Services
             catch { /* 忽略样式设置错误 */ }
         }
 
-        /// <summary>设置标题内置样式</summary>
+        /// <summary>设置标题内置样式，并清除段落级直接格式确保样式生效</summary>
         private void ApplyHeadingStyles(Document doc, FormattingRule rule)
         {
             var builtinMap = new Dictionary<int, WdBuiltinStyle>
@@ -249,11 +249,42 @@ namespace DocuFormatPro.Services
                     // 行距
                     ApplyLineSpacing(style.ParagraphFormat, heading.LineSpacingType, heading.LineSpacingValue);
 
-                    // 段前段后
+                    // 段前段后（固定 6pt）
                     style.ParagraphFormat.SpaceBeforeAuto = 0;
                     style.ParagraphFormat.SpaceAfterAuto = 0;
-                    style.ParagraphFormat.SpaceBefore = heading.SpaceBeforeLines * 12f;
-                    style.ParagraphFormat.SpaceAfter = heading.SpaceAfterLines * 12f;
+                    style.ParagraphFormat.SpaceBefore = 6f;
+                    style.ParagraphFormat.SpaceAfter = 6f;
+                }
+                catch { continue; }
+            }
+
+            // 遍历所有标题段落，清除直接格式（direct formatting），强制让样式定义生效
+            // 不清除直接格式时，段落级覆盖会屏蔽样式修改，需手动点击样式才能刷新
+            var headingStyleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "标题 1", "标题 2", "标题 3",
+                "Heading 1", "Heading 2", "Heading 3"
+            };
+
+            foreach (Paragraph para in doc.Paragraphs)
+            {
+                try
+                {
+                    var styleName = ((Style)para.get_Style()).NameLocal;
+                    if (!headingStyleNames.Contains(styleName)) continue;
+
+                    // 清除段落级直接字体格式
+                    para.Range.Font.Reset();
+
+                    // 清除段落级直接段落格式（重新应用样式即可覆盖）
+                    object styleObj = para.get_Style();
+                    para.set_Style(ref styleObj);
+
+                    // 强制左缩进为 0，清除可能从正文继承的首行缩进
+                    para.Format.LeftIndent = 0;
+                    para.Format.FirstLineIndent = 0;
+                    para.Format.CharacterUnitFirstLineIndent = 0;
+                    para.Format.CharacterUnitLeftIndent = 0;
                 }
                 catch { continue; }
             }

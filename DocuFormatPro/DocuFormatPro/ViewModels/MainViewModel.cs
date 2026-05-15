@@ -50,6 +50,10 @@ namespace DocuFormatPro.ViewModels
                 "宋体", "黑体", "楷体", "仿宋", "微软雅黑",
                 "华文中宋", "华文楷体", "华文仿宋", "方正小标宋简体"
             };
+            HeadingChineseFontNames = new ObservableCollection<string>
+            {
+                "宋体", "黑体", "隶书", "仿宋"
+            };
             EnglishFontNames = new ObservableCollection<string>
             {
                 "Times New Roman", "Arial", "Calibri", "Cambria",
@@ -84,6 +88,7 @@ namespace DocuFormatPro.ViewModels
         public ObservableCollection<FileItem> FileItems { get; }
         public ObservableCollection<string> SavedRuleNames { get; }
         public ObservableCollection<string> ChineseFontNames { get; }
+        public ObservableCollection<string> HeadingChineseFontNames { get; }
         public ObservableCollection<string> EnglishFontNames { get; }
         public ObservableCollection<string> FontSizeNames { get; }
         public ObservableCollection<string> LineSpacingTypes { get; }
@@ -401,6 +406,13 @@ namespace DocuFormatPro.ViewModels
         {
             heading.FontSizeName = sizeName;
             heading.FontSizePoint = FontSizeMapping.GetPoint(sizeName);
+        }
+
+        /// <summary>通过标题级别索引同步字号（用于 UI ItemsControl 中的 SelectionChanged）</summary>
+        public void SyncHeadingFontSizeByLevel(int level, string sizeName)
+        {
+            var heading = CurrentRule.Headings?.FirstOrDefault(h => h.Level == level);
+            if (heading != null) SyncHeadingFontSize(heading, sizeName);
         }
 
         #endregion

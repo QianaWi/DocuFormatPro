@@ -116,42 +116,42 @@ namespace DocuFormatPro.Models
                     new HeadingStyle
                     {
                         Level = 1,
-                        ChineseFontName = "黑体",
+                        ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
-                        FontSizePoint = 16f,    // 三号 = 16pt
-                        FontSizeName = "三号",
+                        FontSizePoint = 15f,    // 小三 = 15pt
+                        FontSizeName = "小三",
                         IsBold = true,
-                        Alignment = TextAlignment.Center,
-                        SpaceBeforeLines = 0.5f,
-                        SpaceAfterLines = 0.5f,
+                        Alignment = TextAlignment.Left,
+                        SpaceBeforeLines = 0f,
+                        SpaceAfterLines = 0f,
                         LineSpacingType = LineSpacingType.Multiple,
                         LineSpacingValue = 1.4f
                     },
                     new HeadingStyle
                     {
                         Level = 2,
-                        ChineseFontName = "黑体",
+                        ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
                         FontSizePoint = 14f,    // 四号 = 14pt
                         FontSizeName = "四号",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
-                        SpaceBeforeLines = 0.5f,
-                        SpaceAfterLines = 0.5f,
+                        SpaceBeforeLines = 0f,
+                        SpaceAfterLines = 0f,
                         LineSpacingType = LineSpacingType.Multiple,
                         LineSpacingValue = 1.4f
                     },
                     new HeadingStyle
                     {
                         Level = 3,
-                        ChineseFontName = "黑体",
+                        ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
                         FontSizePoint = 12f,    // 小四 = 12pt
                         FontSizeName = "小四",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
-                        SpaceBeforeLines = 0.5f,
-                        SpaceAfterLines = 0.5f,
+                        SpaceBeforeLines = 0f,
+                        SpaceAfterLines = 0f,
                         LineSpacingType = LineSpacingType.Multiple,
                         LineSpacingValue = 1.4f
                     }
@@ -192,7 +192,7 @@ namespace DocuFormatPro.Models
         private float _fontSizePoint = 12f;
         private string _fontSizeName = "小四";
         private bool _isBold;
-        private bool _useCustomFontColor = false;
+        private bool _useCustomFontColor = true;
         private string _fontColorHex = "#000000";
 
         public string ChineseFontName { get => _chineseFontName; set { _chineseFontName = value; OnPropertyChanged(); } }
@@ -285,7 +285,7 @@ namespace DocuFormatPro.Models
         private float _spaceAfterLines = 0.5f;
         private LineSpacingType _lineSpacingType = LineSpacingType.Multiple;
         private float _lineSpacingValue = 1.4f;
-        private bool _useCustomFontColor = false;
+        private bool _useCustomFontColor = true;
         private string _fontColorHex = "#000000";
 
         public int Level { get => _level; set { _level = value; OnPropertyChanged(); } }

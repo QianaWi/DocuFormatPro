@@ -85,6 +85,15 @@ namespace DocuFormatPro
                 _viewModel.SyncBodyFontSize(sizeName);
         }
 
+        private void HeadingFontSize_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedItem is string sizeName && cb.Tag is string tag)
+            {
+                if (int.TryParse(tag, out int level))
+                    _viewModel.SyncHeadingFontSizeByLevel(level, sizeName);
+            }
+        }
+
         private void BodyLineSpacingType_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (sender is ComboBox cb && cb.SelectedIndex >= 0)
