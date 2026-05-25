@@ -275,9 +275,9 @@
                         </Border>
 
                         <!-- TEMPLATE ACTIONS -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}">
+                        <Border Style="{StaticResource RuleGroupCardStyle}" IsEnabled="False" Opacity="0.5">
                             <StackPanel>
-                                <TextBlock Text="模板管理" Style="{StaticResource RuleGroupTitleStyle}"/>
+                                <TextBlock Text="模板管理（暂未开放）" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <Button Content="📥 从文档提取模板" Style="{StaticResource SmallPrimaryButtonStyle}" Background="#6C63FF" Command="{Binding ImportTemplateCommand}" Margin="0,0,0,6" HorizontalAlignment="Stretch"/>
                                 <UniformGrid Columns="2" Margin="0,0,0,6">
                                     <Button Content="💾 保存模板" Style="{StaticResource SmallOutlineButtonStyle}" Command="{Binding SaveRuleCommand}" Margin="0,0,4,0"/>

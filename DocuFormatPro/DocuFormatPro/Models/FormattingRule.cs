@@ -233,8 +233,8 @@ namespace DocuFormatPro.Models
     /// <summary>表格格式设置</summary>
     public class TableSettings : INotifyPropertyChanged
     {
-        private bool _applyTableFormatting = true;
-        private bool _applyTableCaptions = true;
+        private bool _applyTableFormatting = false;
+        private bool _applyTableCaptions = false;
         private bool _useSameAsBody = true;
         private bool _headerBold = true;
         private float _spaceBeforeLines;
