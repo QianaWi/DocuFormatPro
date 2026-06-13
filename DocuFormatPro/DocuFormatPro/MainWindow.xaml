@@ -228,6 +228,17 @@
                                 <!-- 固定参数说明 -->
                                 <TextBlock Text="英文字体：Times New Roman  ·  段前/段后：6pt  ·  行距：1.4倍"
                                            FontSize="9.5" Foreground="#9CA3AF" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <!-- 标题自动编号 -->
+                                <Separator Background="#E5E7EB" Margin="0,8,0,6"/>
+                                <CheckBox Content="启用标题自动编号" IsChecked="{Binding CurrentRule.HeadingNumbering.EnableNumbering}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <StackPanel IsEnabled="{Binding CurrentRule.HeadingNumbering.EnableNumbering}">
+                                    <CheckBox Content="去除现有编号前缀后重新编号" IsChecked="{Binding CurrentRule.HeadingNumbering.StripExistingNumbers}" Style="{StaticResource RuleCheckBoxStyle}" Margin="0,2,0,4"/>
+                                    <TextBlock Text="编号方案" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                    <ComboBox ItemsSource="{Binding HeadingNumberingSchemes}"
+                                              Style="{StaticResource RuleComboBoxStyle}"
+                                              SelectedIndex="0"
+                                              SelectionChanged="HeadingNumberingScheme_Changed"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -239,8 +250,8 @@
                                 <CheckBox Content="自动处理题注编号" IsChecked="{Binding CurrentRule.Table.ApplyTableCaptions}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.Table.ApplyTableFormatting}">
                                 <CheckBox Content="字体与正文一致" IsChecked="{Binding CurrentRule.Table.UseSameAsBody}" Style="{StaticResource RuleCheckBoxStyle}"/>
-                                <CheckBox Content="表头加粗" IsChecked="{Binding CurrentRule.Table.HeaderBold}" Style="{StaticResource RuleCheckBoxStyle}"/>
-                                <CheckBox Content="跨页重复表头" IsChecked="{Binding CurrentRule.Table.RepeatHeaderRow}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <CheckBox Content="表头加粗" IsChecked="{Binding CurrentRule.Table.HeaderBold}" Style="{StaticResource RuleCheckBoxStyle}" IsEnabled="False"/>
+                                <CheckBox Content="跨页重复表头" IsChecked="{Binding CurrentRule.Table.RepeatHeaderRow}" Style="{StaticResource RuleCheckBoxStyle}" IsEnabled="False"/>
                                 <UniformGrid Columns="2" Margin="0,4,0,0">
                                     <StackPanel Margin="0,0,4,0">
                                         <TextBlock Text="行距值 (磅)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
@@ -352,7 +363,7 @@
                         </StackPanel>
                         <Button Grid.Column="1" Content="＋ 添加文件" Style="{StaticResource SecondaryButtonStyle}" Padding="12,6" FontSize="11.5" Command="{Binding AddFilesCommand}"/>
                     </Grid>
-                    <ListView Grid.Row="1" ItemsSource="{Binding FileItems}" Style="{StaticResource FileListViewStyle}" ItemContainerStyle="{StaticResource FileListItemStyle}">
+                    <ListView Grid.Row="1" ItemsSource="{Binding FileItems}" SelectedItem="{Binding SelectedFileItem, Mode=TwoWay}" Style="{StaticResource FileListViewStyle}" ItemContainerStyle="{StaticResource FileListItemStyle}">
                         <ListView.ItemTemplate>
                             <DataTemplate>
                                 <Grid>

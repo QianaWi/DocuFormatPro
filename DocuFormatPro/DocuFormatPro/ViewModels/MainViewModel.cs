@@ -28,6 +28,7 @@ namespace DocuFormatPro.ViewModels
         private bool _hasFiles;
         private FormattingRule _currentRule;
         private string? _selectedSavedRuleName;
+        private FileItem? _selectedFileItem;
 
         public MainViewModel()
         {
@@ -68,6 +69,12 @@ namespace DocuFormatPro.ViewModels
             {
                 "左对齐", "居中", "右对齐", "两端对齐"
             };
+            HeadingNumberingSchemes = new ObservableCollection<string>
+            {
+                "1 / 1.1 / 1.1.1（数字层级）",
+                "第X章 / 1.1 / 1.1.1",
+                "一、/（一）/ 1.（传统公文）"
+            };
 
             // 初始化命令
             AddFilesCommand = new RelayCommand(_ => AddFiles(), _ => !IsProcessing);
@@ -93,6 +100,7 @@ namespace DocuFormatPro.ViewModels
         public ObservableCollection<string> FontSizeNames { get; }
         public ObservableCollection<string> LineSpacingTypes { get; }
         public ObservableCollection<string> AlignmentTypes { get; }
+        public ObservableCollection<string> HeadingNumberingSchemes { get; }
 
         /// <summary>当前排版规则</summary>
         public FormattingRule CurrentRule
@@ -134,6 +142,13 @@ namespace DocuFormatPro.ViewModels
             set { _hasFiles = value; OnPropertyChanged(); }
         }
 
+        /// <summary>文件列表中当前选中的条目，null 表示未选中（批量模式）</summary>
+        public FileItem? SelectedFileItem
+        {
+            get => _selectedFileItem;
+            set { _selectedFileItem = value; OnPropertyChanged(); }
+        }
+
         #endregion
 
         #region Commands
@@ -168,10 +183,24 @@ namespace DocuFormatPro.ViewModels
             }
         }
 
+        public Func<string, bool>? ShowFileLockedWarning { get; set; }
+
         public void AddFileToQueue(string filePath)
         {
             string ext = Path.GetExtension(filePath).ToLowerInvariant();
             if (ext != ".doc" && ext != ".docx") return;
+
+            // 检测文件是否被其他进程占用
+            try
+            {
+                using var fs = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                ShowFileLockedWarning?.Invoke(filePath);
+                return;
+            }
+            catch { /* 其他异常忽略，继续尝试加入队列 */ }
 
             var existing = FileItems.FirstOrDefault(f => f.FilePath == filePath);
             if (existing != null)
@@ -223,10 +252,15 @@ namespace DocuFormatPro.ViewModels
         {
             if (FileItems.Count == 0) return;
 
+            // 确定要处理的文件列表：有选中则只处理选中项，否则批量处理全部
+            var itemsToProcess = SelectedFileItem != null
+                ? new List<FileItem> { SelectedFileItem }
+                : FileItems.ToList();
+
             // 弹出二次确认对话框
             if (ConfirmBeforeProcessing != null)
             {
-                bool confirmed = ConfirmBeforeProcessing(CurrentRule, FileItems.Count);
+                bool confirmed = ConfirmBeforeProcessing(CurrentRule, itemsToProcess.Count);
                 if (!confirmed) return;
             }
 
@@ -234,12 +268,12 @@ namespace DocuFormatPro.ViewModels
             ProgressValue = 0;
             _cts = new CancellationTokenSource();
 
-            int total = FileItems.Count;
+            int total = itemsToProcess.Count;
             int processed = 0;
 
             try
             {
-                foreach (var item in FileItems.ToList())
+                foreach (var item in itemsToProcess)
                 {
                     if (_cts.Token.IsCancellationRequested) break;
 
@@ -274,7 +308,7 @@ namespace DocuFormatPro.ViewModels
                 if (_cts.Token.IsCancellationRequested)
                 {
                     StatusText = "任务已取消";
-                    foreach (var i in FileItems.Where(f => f.Status == FileStatus.Queued))
+                    foreach (var i in itemsToProcess.Where(f => f.Status == FileStatus.Queued))
                     {
                         i.Status = FileStatus.Failed;
                         i.StatusMessage = "已取消";
@@ -282,9 +316,10 @@ namespace DocuFormatPro.ViewModels
                 }
                 else
                 {
-                    int ok = FileItems.Count(f => f.Status == FileStatus.Completed);
-                    int fail = FileItems.Count(f => f.Status == FileStatus.Failed);
-                    StatusText = $"处理完成 — 成功: {ok}, 失败: {fail}";
+                    int ok = itemsToProcess.Count(f => f.Status == FileStatus.Completed);
+                    int fail = itemsToProcess.Count(f => f.Status == FileStatus.Failed);
+                    string scope = SelectedFileItem != null ? "单文件" : "批量";
+                    StatusText = $"{scope}处理完成 — 成功: {ok}, 失败: {fail}";
                     ProgressValue = 100;
                 }
             }
@@ -413,6 +448,17 @@ namespace DocuFormatPro.ViewModels
         {
             var heading = CurrentRule.Headings?.FirstOrDefault(h => h.Level == level);
             if (heading != null) SyncHeadingFontSize(heading, sizeName);
+        }
+
+        /// <summary>同步标题编号方案（UI 下拉索引 -> 枚举值）</summary>
+        public void SyncHeadingNumberingScheme(int index)
+        {
+            CurrentRule.HeadingNumbering.Scheme = index switch
+            {
+                1 => HeadingNumberingScheme.ChapterNumeric,
+                2 => HeadingNumberingScheme.Traditional,
+                _ => HeadingNumberingScheme.Numeric
+            };
         }
 
         #endregion

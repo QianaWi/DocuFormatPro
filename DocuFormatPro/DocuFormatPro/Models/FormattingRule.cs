@@ -16,6 +16,7 @@ namespace DocuFormatPro.Models
         private TableSettings _table = new();
         private List<HeadingStyle> _headings = new();
         private FrontMatterSettings _frontMatter = new();
+        private HeadingNumberingSettings _headingNumbering = new();
 
         /// <summary>规则/模板名称</summary>
         public string RuleName
@@ -64,6 +65,13 @@ namespace DocuFormatPro.Models
         {
             get => _frontMatter;
             set { _frontMatter = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>标题自动编号设置</summary>
+        public HeadingNumberingSettings HeadingNumbering
+        {
+            get => _headingNumbering;
+            set { _headingNumbering = value; OnPropertyChanged(); }
         }
 
         /// <summary>
@@ -331,6 +339,39 @@ namespace DocuFormatPro.Models
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
+    /// <summary>标题自动编号设置</summary>
+    public class HeadingNumberingSettings : INotifyPropertyChanged
+    {
+        private bool _enableNumbering = false;
+        private bool _stripExistingNumbers = false;
+        private HeadingNumberingScheme _scheme = HeadingNumberingScheme.Numeric;
+
+        /// <summary>是否启用标题自动编号</summary>
+        public bool EnableNumbering
+        {
+            get => _enableNumbering;
+            set { _enableNumbering = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>是否先去除标题文字中已有的编号前缀</summary>
+        public bool StripExistingNumbers
+        {
+            get => _stripExistingNumbers;
+            set { _stripExistingNumbers = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>编号方案</summary>
+        public HeadingNumberingScheme Scheme
+        {
+            get => _scheme;
+            set { _scheme = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
     #endregion
 
     #region 枚举定义
@@ -373,6 +414,13 @@ namespace DocuFormatPro.Models
         Left,
         Center,
         Right
+    }
+
+    public enum HeadingNumberingScheme
+    {
+        Numeric,        // 1 / 1.1 / 1.1.1
+        ChapterNumeric, // 第一章 / 1.1 / 1.1.1
+        Traditional     // 一、/ （一）/ 1.
     }
 
     #endregion

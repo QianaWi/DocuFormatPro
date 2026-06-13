@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using DocuFormatPro.Models;
 using Microsoft.Office.Interop.Word;
 
@@ -65,6 +66,14 @@ namespace DocuFormatPro.Services
                         progress?.Report("正在设置标题格式...");
                         ApplyHeadingStyles(doc, rule);
                         cancellationToken.ThrowIfCancellationRequested();
+
+                        // ===== 3b. 标题自动编号 =====
+                        if (rule.HeadingNumbering.EnableNumbering)
+                        {
+                            progress?.Report("正在处理标题编号...");
+                            ApplyHeadingNumbering(doc, rule.HeadingNumbering);
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
 
                         // ===== 4. 逐段落应用格式 =====
                         progress?.Report("正在处理段落格式...");
@@ -287,6 +296,153 @@ namespace DocuFormatPro.Services
                     para.Format.CharacterUnitLeftIndent = 0;
                 }
                 catch { continue; }
+            }
+        }
+
+        /// <summary>为标题样式绑定多级列表，实现自动编号（新增/移动标题后编号自动更新）</summary>
+        private void ApplyHeadingNumbering(Document doc, HeadingNumberingSettings settings)
+        {
+            var headingStyleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "标题 1", "标题 2", "标题 3",
+                "Heading 1", "Heading 2", "Heading 3"
+            };
+
+            // 如果选择去除现有编号前缀，先剥离文字中的旧编号
+            if (settings.StripExistingNumbers)
+            {
+                var stripPattern = new Regex(
+                    @"^(\d+(\.\d+)*\.?\s*|第[一二三四五六七八九十百\d]+[章节条]\s*|[一二三四五六七八九十]+[、.]\s*|（[一二三四五六七八九十]+）\s*)",
+                    RegexOptions.None);
+
+                foreach (Paragraph para in doc.Paragraphs)
+                {
+                    try
+                    {
+                        var styleName = ((Style)para.get_Style()).NameLocal;
+                        if (!headingStyleNames.Contains(styleName)) continue;
+
+                        var r = para.Range;
+                        object unit = WdUnits.wdCharacter;
+                        object cnt = -1;
+                        r.MoveEnd(ref unit, ref cnt);
+                        string currentText = r.Text ?? "";
+                        string stripped = stripPattern.Replace(currentText, "").TrimStart();
+                        if (stripped != currentText)
+                            r.Text = stripped;
+                    }
+                    catch { continue; }
+                }
+            }
+
+            try
+            {
+                // 创建多级列表模板
+                var lt = doc.ListTemplates.Add(OutlineNumbered: true);
+
+                for (int level = 1; level <= 3; level++)
+                {
+                    var ll = lt.ListLevels[level];
+                    ll.StartAt = 1;
+
+                    switch (settings.Scheme)
+                    {
+                        case HeadingNumberingScheme.Numeric:
+                            ll.NumberFormat = level switch
+                            {
+                                1 => "%1",
+                                2 => "%1.%2",
+                                _ => "%1.%2.%3"
+                            };
+                            ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                            ll.TrailingCharacter = WdTrailingCharacter.wdTrailingSpace;
+                            break;
+
+                        case HeadingNumberingScheme.ChapterNumeric:
+                            if (level == 1)
+                            {
+                                ll.NumberFormat = "第%1章";
+                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
+                            }
+                            else
+                            {
+                                ll.NumberFormat = level == 2 ? "%1.%2" : "%1.%2.%3";
+                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                            }
+                            ll.TrailingCharacter = WdTrailingCharacter.wdTrailingSpace;
+                            break;
+
+                        case HeadingNumberingScheme.Traditional:
+                            if (level == 1)
+                            {
+                                ll.NumberFormat = "%1、";
+                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
+                            }
+                            else if (level == 2)
+                            {
+                                ll.NumberFormat = "（%2）";
+                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
+                            }
+                            else
+                            {
+                                ll.NumberFormat = "%3.";
+                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                            }
+                            ll.TrailingCharacter = WdTrailingCharacter.wdTrailingTab;
+                            break;
+                    }
+
+                    ll.Alignment = WdListLevelAlignment.wdListLevelAlignLeft;
+                    ll.NumberPosition = 0;
+                    ll.TextPosition = 0;
+                    ll.TabPosition = 0;
+                }
+
+                // 对每个标题段落分别应用对应级别的列表
+                foreach (Paragraph para in doc.Paragraphs)
+                {
+                    try
+                    {
+                        var styleName = ((Style)para.get_Style()).NameLocal;
+                        if (!headingStyleNames.Contains(styleName)) continue;
+
+                        // 根据样式名确定级别
+                        int level = 1;
+                        if (styleName.Contains("2")) level = 2;
+                        else if (styleName.Contains("3")) level = 3;
+
+                        para.Range.ListFormat.ApplyListTemplateWithLevel(
+                            lt,
+                            ContinuePreviousList: true,
+                            ApplyTo: WdListApplyTo.wdListApplyToWholeList,
+                            DefaultListBehavior: WdDefaultListBehavior.wdWord10ListBehavior,
+                            ApplyLevel: level);
+                    }
+                    catch { continue; }
+                }
+
+                // 更新域以刷新编号显示
+                try { doc.Fields.Update(); } catch { }
+            }
+            catch { /* 多级列表创建失败，静默忽略 */ }
+        }
+
+        /// <summary>获取文档中对应级别的标题样式名称（中文或英文）</summary>
+        private string GetHeadingStyleName(Document doc, int level)
+        {
+            try
+            {
+                var builtinStyle = level switch
+                {
+                    1 => WdBuiltinStyle.wdStyleHeading1,
+                    2 => WdBuiltinStyle.wdStyleHeading2,
+                    _ => WdBuiltinStyle.wdStyleHeading3
+                };
+                return doc.Styles[builtinStyle].NameLocal;
+            }
+            catch
+            {
+                return $"Heading {level}";
             }
         }
 

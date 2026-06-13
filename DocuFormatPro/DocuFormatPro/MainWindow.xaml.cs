@@ -26,6 +26,56 @@ namespace DocuFormatPro
                 };
                 return dialog.ShowDialog() == true;
             };
+
+            // 注入文件锁定警告（模态置顶）
+            _viewModel.ShowFileLockedWarning = (filePath) =>
+            {
+                string fileName = System.IO.Path.GetFileName(filePath);
+                var msg = new Window
+                {
+                    Title = "文件被占用",
+                    Width = 380,
+                    Height = 160,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    ResizeMode = ResizeMode.NoResize,
+                    Owner = this,
+                    Topmost = true,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    Background = System.Windows.Media.Brushes.White
+                };
+                var panel = new StackPanel { Margin = new Thickness(24, 20, 24, 16) };
+                panel.Children.Add(new TextBlock
+                {
+                    Text = $"⚠️  文档已被其他程序占用",
+                    FontSize = 14,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x2E)),
+                    Margin = new Thickness(0, 0, 0, 8)
+                });
+                panel.Children.Add(new TextBlock
+                {
+                    Text = $"请先关闭 Word 中打开的「{fileName}」，再重新拖入。",
+                    FontSize = 12,
+                    Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6B, 0x72, 0x80)),
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 16)
+                });
+                var btn = new Button
+                {
+                    Content = "确定",
+                    Width = 80,
+                    Height = 30,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF)),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    BorderThickness = new Thickness(0)
+                };
+                btn.Click += (_, _) => msg.Close();
+                panel.Children.Add(btn);
+                msg.Content = panel;
+                msg.ShowDialog();
+                return true;
+            };
         }
 
         private void Window_DragEnter(object sender, DragEventArgs e)
@@ -92,6 +142,12 @@ namespace DocuFormatPro
                 if (int.TryParse(tag, out int level))
                     _viewModel.SyncHeadingFontSizeByLevel(level, sizeName);
             }
+        }
+
+        private void HeadingNumberingScheme_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedIndex >= 0)
+                _viewModel.SyncHeadingNumberingScheme(cb.SelectedIndex);
         }
 
         private void BodyLineSpacingType_Changed(object sender, SelectionChangedEventArgs e)
