@@ -108,8 +108,8 @@ namespace DocuFormatPro.Models
                 Paragraph = new ParagraphSettings
                 {
                     FirstLineIndentChars = 2f,
-                    LineSpacingType = LineSpacingType.Multiple,
-                    LineSpacingValue = 1.4f,
+                    LineSpacingType = LineSpacingType.OneAndHalf,
+                    LineSpacingValue = 1.5f,
                     SpaceBeforeLines = 0f,
                     SpaceAfterLines = 0f
                 },
@@ -139,42 +139,42 @@ namespace DocuFormatPro.Models
                         Level = 1,
                         ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
-                        FontSizePoint = 15f,    // 小三 = 15pt
+                        FontSizePoint = 15f,
                         FontSizeName = "小三",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
                         SpaceBeforeLines = 0f,
                         SpaceAfterLines = 0f,
-                        LineSpacingType = LineSpacingType.Multiple,
-                        LineSpacingValue = 1.4f
+                        LineSpacingType = LineSpacingType.OneAndHalf,
+                        LineSpacingValue = 1.5f
                     },
                     new HeadingStyle
                     {
                         Level = 2,
                         ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
-                        FontSizePoint = 14f,    // 四号 = 14pt
+                        FontSizePoint = 14f,
                         FontSizeName = "四号",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
                         SpaceBeforeLines = 0f,
                         SpaceAfterLines = 0f,
-                        LineSpacingType = LineSpacingType.Multiple,
-                        LineSpacingValue = 1.4f
+                        LineSpacingType = LineSpacingType.OneAndHalf,
+                        LineSpacingValue = 1.5f
                     },
                     new HeadingStyle
                     {
                         Level = 3,
                         ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
-                        FontSizePoint = 12f,    // 小四 = 12pt
+                        FontSizePoint = 12f,
                         FontSizeName = "小四",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
                         SpaceBeforeLines = 0f,
                         SpaceAfterLines = 0f,
-                        LineSpacingType = LineSpacingType.Multiple,
-                        LineSpacingValue = 1.4f
+                        LineSpacingType = LineSpacingType.OneAndHalf,
+                        LineSpacingValue = 1.5f
                     }
                 }
             };
@@ -235,8 +235,8 @@ namespace DocuFormatPro.Models
     public class ParagraphSettings : INotifyPropertyChanged
     {
         private float _firstLineIndentChars = 2f;
-        private LineSpacingType _lineSpacingType = LineSpacingType.Multiple;
-        private float _lineSpacingValue = 1.4f;
+        private LineSpacingType _lineSpacingType = LineSpacingType.OneAndHalf;
+        private float _lineSpacingValue = 1.5f;
         private float _spaceBeforeLines;
         private float _spaceAfterLines;
 
@@ -319,8 +319,8 @@ namespace DocuFormatPro.Models
         private TextAlignment _alignment = TextAlignment.Left;
         private float _spaceBeforeLines = 0.5f;
         private float _spaceAfterLines = 0.5f;
-        private LineSpacingType _lineSpacingType = LineSpacingType.Multiple;
-        private float _lineSpacingValue = 1.4f;
+        private LineSpacingType _lineSpacingType = LineSpacingType.OneAndHalf;
+        private float _lineSpacingValue = 1.5f;
         private bool _useCustomFontColor = true;
         private string _fontColorHex = "#000000";
 

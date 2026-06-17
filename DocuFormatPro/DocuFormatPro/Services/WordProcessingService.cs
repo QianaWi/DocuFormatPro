@@ -93,9 +93,10 @@ namespace DocuFormatPro.Services
 
                         // ===== 6. 清除所有文字背景色 =====
                         progress?.Report("正在清除文字背景色...");
-                        // 如果启用了首行底色，跳过首行单元格，避免清除后再设置的竞争问题
+                        // 未勾选"应用表格样式"时，跳过所有表格单元格，保留用户已有的表格底色
+                        bool skipAllTableCells = !rule.Table.ApplyTableFormatting;
                         bool skipFirstRow = rule.Table.ApplyTableFormatting && rule.Table.UseHeaderShading;
-                        ClearAllTextBackground(doc, skipFirstRow);
+                        ClearAllTextBackground(doc, skipFirstRow, skipAllTableCells);
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 6b. 重新应用首行底色（在清除背景后执行，避免被覆盖）=====
@@ -522,7 +523,7 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>清除所有文字的背景色（高亮和底纹），并逐个清除表格单元格背景</summary>
-        private void ClearAllTextBackground(Document doc, bool skipFirstRowOfTables = false)
+        private void ClearAllTextBackground(Document doc, bool skipFirstRowOfTables = false, bool skipAllTableCells = false)
         {
             try
             {
@@ -533,6 +534,9 @@ namespace DocuFormatPro.Services
                 ClearShading(doc.Content.Shading);
             }
             catch { }
+
+            // 未勾选表格格式化时，跳过所有表格单元格，保留用户已设置的底色
+            if (skipAllTableCells) return;
 
             // 逐个单元格清除背景色，跳过需要保留底色的首行
             foreach (Table table in doc.Tables)
