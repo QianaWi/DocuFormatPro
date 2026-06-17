@@ -461,6 +461,13 @@ namespace DocuFormatPro.ViewModels
             };
         }
 
+        /// <summary>同步表格字号</summary>
+        public void SyncTableFontSize(string sizeName)
+        {
+            CurrentRule.Table.FontSizeName = sizeName;
+            CurrentRule.Table.FontSizePoint = FontSizeMapping.GetPoint(sizeName);
+        }
+
         #endregion
 
         public void Cleanup()

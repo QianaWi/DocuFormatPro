@@ -127,6 +127,8 @@
                                     <CheckBox Content="设置字体颜色" IsChecked="{Binding CurrentRule.BodyText.UseCustomFontColor}" Style="{StaticResource RuleCheckBoxStyle}" VerticalAlignment="Center"/>
                                     <TextBox Text="{Binding CurrentRule.BodyText.FontColorHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="80" Margin="8,0,0,0" IsEnabled="{Binding CurrentRule.BodyText.UseCustomFontColor}" VerticalAlignment="Center"/>
                                 </StackPanel>
+                                <Separator Background="#E5E7EB" Margin="0,8,0,6"/>
+                                <CheckBox Content="规范化文本（去除中英文空格、英文标点转中文）" IsChecked="{Binding CurrentRule.NormalizeBodyText}" Style="{StaticResource RuleCheckBoxStyle}"/>
                             </StackPanel>
                         </Border>
 
@@ -249,19 +251,37 @@
                                 <CheckBox Content="应用表格样式" IsChecked="{Binding CurrentRule.Table.ApplyTableFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <CheckBox Content="自动处理题注编号" IsChecked="{Binding CurrentRule.Table.ApplyTableCaptions}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.Table.ApplyTableFormatting}">
-                                <CheckBox Content="字体与正文一致" IsChecked="{Binding CurrentRule.Table.UseSameAsBody}" Style="{StaticResource RuleCheckBoxStyle}"/>
-                                <CheckBox Content="表头加粗" IsChecked="{Binding CurrentRule.Table.HeaderBold}" Style="{StaticResource RuleCheckBoxStyle}" IsEnabled="False"/>
-                                <CheckBox Content="跨页重复表头" IsChecked="{Binding CurrentRule.Table.RepeatHeaderRow}" Style="{StaticResource RuleCheckBoxStyle}" IsEnabled="False"/>
-                                <UniformGrid Columns="2" Margin="0,4,0,0">
-                                    <StackPanel Margin="0,0,4,0">
-                                        <TextBlock Text="行距值 (磅)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
-                                        <TextBox Text="{Binding CurrentRule.Table.LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
+                                    <!-- 字体字号 -->
+                                    <TextBlock Text="中文字体" FontSize="10.5" Foreground="#9CA3AF" Margin="0,6,0,3"/>
+                                    <ComboBox ItemsSource="{Binding ChineseFontNames}" SelectedItem="{Binding CurrentRule.Table.ChineseFontName}" Style="{StaticResource RuleComboBoxStyle}" IsEditable="True"/>
+                                    <UniformGrid Columns="2" Margin="0,4,0,0">
+                                        <StackPanel Margin="0,0,4,0">
+                                            <TextBlock Text="字号" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                            <ComboBox ItemsSource="{Binding FontSizeNames}" SelectedItem="{Binding CurrentRule.Table.FontSizeName}" Style="{StaticResource RuleComboBoxStyle}" SelectionChanged="TableFontSize_Changed"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="4,0,0,0">
+                                            <TextBlock Text="磅值" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                            <TextBox Text="{Binding CurrentRule.Table.FontSizePoint, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
+                                        </StackPanel>
+                                    </UniformGrid>
+                                    <!-- 首行底色 -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <CheckBox Content="首行底色" IsChecked="{Binding CurrentRule.Table.UseHeaderShading}" Style="{StaticResource RuleCheckBoxStyle}" VerticalAlignment="Center"/>
+                                        <TextBox Text="{Binding CurrentRule.Table.HeaderShadingColorHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="75" Margin="8,0,0,0" IsEnabled="{Binding CurrentRule.Table.UseHeaderShading}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                    <StackPanel Margin="4,0,0,0">
-                                        <TextBlock Text="边框" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
-                                        <TextBox Text="黑色单细线" Style="{StaticResource RuleTextBoxStyle}" IsReadOnly="True"/>
-                                    </StackPanel>
-                                </UniformGrid>
+                                    <!-- 固定默认项 -->
+                                    <CheckBox Content="表头加粗" IsChecked="{Binding CurrentRule.Table.HeaderBold}" Style="{StaticResource RuleCheckBoxStyle}" IsEnabled="False" Margin="0,4,0,0"/>
+                                    <CheckBox Content="跨页重复表头" IsChecked="{Binding CurrentRule.Table.RepeatHeaderRow}" Style="{StaticResource RuleCheckBoxStyle}" IsEnabled="False"/>
+                                    <UniformGrid Columns="2" Margin="0,4,0,0">
+                                        <StackPanel Margin="0,0,4,0">
+                                            <TextBlock Text="行距值 (磅)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                            <TextBox Text="{Binding CurrentRule.Table.LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="4,0,0,0">
+                                            <TextBlock Text="边框" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                            <TextBox Text="黑色单细线" Style="{StaticResource RuleTextBoxStyle}" IsReadOnly="True"/>
+                                        </StackPanel>
+                                    </UniformGrid>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

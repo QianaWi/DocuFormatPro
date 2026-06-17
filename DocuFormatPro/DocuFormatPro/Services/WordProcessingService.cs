@@ -1,5 +1,8 @@
 using System.Runtime.InteropServices;
+using System.IO;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using DocuFormatPro.Models;
 using Microsoft.Office.Interop.Word;
 
@@ -90,8 +93,25 @@ namespace DocuFormatPro.Services
 
                         // ===== 6. 清除所有文字背景色 =====
                         progress?.Report("正在清除文字背景色...");
-                        ClearAllTextBackground(doc);
+                        // 如果启用了首行底色，跳过首行单元格，避免清除后再设置的竞争问题
+                        bool skipFirstRow = rule.Table.ApplyTableFormatting && rule.Table.UseHeaderShading;
+                        ClearAllTextBackground(doc, skipFirstRow);
                         cancellationToken.ThrowIfCancellationRequested();
+
+                        // ===== 6b. 重新应用首行底色（在清除背景后执行，避免被覆盖）=====
+                        if (rule.Table.ApplyTableFormatting && rule.Table.UseHeaderShading)
+                        {
+                            progress?.Report("正在设置表格首行底色...");
+                            ApplyTableHeaderShading(doc, rule.Table);
+                        }
+
+                        // ===== 6b. 规范化正文文本 =====
+                        if (rule.NormalizeBodyText)
+                        {
+                            var normalizer = new TextNormalizationService();
+                            normalizer.NormalizeBodyText(doc, progress);
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
 
                         // ===== 7. 处理表格和图片题注 =====
                         if (rule.Table.ApplyTableCaptions)
@@ -118,6 +138,16 @@ namespace DocuFormatPro.Services
 
                         progress?.Report("正在保存文档...");
                         doc.SaveAs2(FileName: outputPath);
+                        if (rule.Table.ApplyTableFormatting &&
+                            rule.Table.UseHeaderShading &&
+                            string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase))
+                        {
+                            doc.Close(WdSaveOptions.wdDoNotSaveChanges);
+                            Marshal.ReleaseComObject(doc);
+                            doc = null;
+
+                            EnsureDocxHeaderCellShading(outputPath, rule.Table.HeaderShadingColorHex);
+                        }
 
                         progress?.Report($"文档处理完成: {System.IO.Path.GetFileName(outputPath)}");
                     }
@@ -492,21 +522,19 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>清除所有文字的背景色（高亮和底纹），并逐个清除表格单元格背景</summary>
-        private void ClearAllTextBackground(Document doc)
+        private void ClearAllTextBackground(Document doc, bool skipFirstRowOfTables = false)
         {
             try
             {
                 // 清除全文高亮
                 doc.Content.HighlightColorIndex = WdColorIndex.wdNoHighlight;
 
-                // 清除全文底纹（对正文段落有效，但对表格单元格可能产生混合状态）
-                doc.Content.Shading.Texture = WdTextureIndex.wdTextureNone;
-                doc.Content.Shading.BackgroundPatternColor = WdColor.wdColorWhite;
-                doc.Content.Shading.ForegroundPatternColor = WdColor.wdColorWhite;
+                // 清除全文底纹
+                ClearShading(doc.Content.Shading);
             }
             catch { }
 
-            // 逐个单元格清除背景色，避免 doc.Content.Shading 对表格产生脏状态
+            // 逐个单元格清除背景色，跳过需要保留底色的首行
             foreach (Table table in doc.Tables)
             {
                 try
@@ -515,9 +543,15 @@ namespace DocuFormatPro.Services
                     {
                         try
                         {
-                            cell.Shading.Texture = WdTextureIndex.wdTextureNone;
-                            cell.Shading.BackgroundPatternColor = WdColor.wdColorWhite;
-                            cell.Shading.ForegroundPatternColor = WdColor.wdColorWhite;
+                            if (skipFirstRowOfTables)
+                            {
+                                bool isFirstRow = false;
+                                try { isFirstRow = cell.RowIndex == 1; } catch { }
+                                if (isFirstRow) continue;
+                            }
+
+                            ClearShading(cell.Shading);
+                            ClearShading(cell.Range.Shading);
                         }
                         catch { continue; }
                     }
@@ -535,6 +569,28 @@ namespace DocuFormatPro.Services
                 {
                     // ── 表格自动适应窗口宽度 ──
                     table.AutoFitBehavior(WdAutoFitBehavior.wdAutoFitWindow);
+
+                    // ── 清除表格样式的行列格式标志，避免样式覆盖我们设置的底纹 ──
+                    try
+                    {
+                        table.ApplyStyleHeadingRows = false;
+                        table.ApplyStyleFirstColumn = false;
+                        table.ApplyStyleLastColumn = false;
+                        table.ApplyStyleRowBands = false;
+                        table.ApplyStyleColumnBands = false;
+                    }
+                    catch { }
+
+                    // ── 所有行行高：最小值 1 厘米 ──
+                    foreach (Row row in table.Rows)
+                    {
+                        try
+                        {
+                            row.HeightRule = WdRowHeightRule.wdRowHeightAtLeast;
+                            row.Height = (float)(1.0 * 28.35); // 1cm ≈ 28.35pt
+                        }
+                        catch { }
+                    }
 
                     // ── 设置边框 ──
                     ApplyTableBorders(table, rule.Table);
@@ -560,43 +616,41 @@ namespace DocuFormatPro.Services
                                 _ => WdParagraphAlignment.wdAlignParagraphCenter
                             };
 
-                            // 字体（与正文一致）
-                            if (rule.Table.UseSameAsBody)
-                            {
-                                cell.Range.Font.Name = rule.BodyText.ChineseFontName;
-                                cell.Range.Font.NameAscii = rule.BodyText.EnglishFontName;
-                                cell.Range.Font.Size = rule.BodyText.FontSizePoint;
-                                cell.Range.Font.Bold = 0; // 默认不加粗
-                                cell.Range.Font.Color = rule.BodyText.UseCustomFontColor
-                                    ? ParseHexToWdColor(rule.BodyText.FontColorHex)
-                                    : WdColor.wdColorBlack;
-                            }
+                            // 字体（使用表格独立配置）
+                            cell.Range.Font.Name = rule.Table.ChineseFontName;
+                            cell.Range.Font.NameAscii = rule.Table.EnglishFontName;
+                            cell.Range.Font.Size = rule.Table.FontSizePoint;
+                            cell.Range.Font.Bold = 0;
+                            cell.Range.Font.Color = WdColor.wdColorBlack;
 
-                            // 段落格式
+                            // 段落：不缩进，水平居中，单元格垂直居中（默认）
                             cell.Range.ParagraphFormat.SpaceBefore = rule.Table.SpaceBeforeLines * 12f;
                             cell.Range.ParagraphFormat.SpaceAfter = rule.Table.SpaceAfterLines * 12f;
                             ApplyLineSpacing(cell.Range.ParagraphFormat, rule.Table.LineSpacingType, rule.Table.LineSpacingValue);
 
-                            // 清除首行缩进
+                            // 清除首行缩进（默认行为）
                             cell.Range.ParagraphFormat.FirstLineIndent = 0;
                             cell.Range.ParagraphFormat.CharacterUnitFirstLineIndent = 0;
+                            cell.Range.ParagraphFormat.LeftIndent = 0;
+                            cell.Range.ParagraphFormat.CharacterUnitLeftIndent = 0;
                         }
                         catch { continue; }
                     }
 
-                    // ── 表头加粗 ──
-                    if (rule.Table.HeaderBold && table.Rows.Count > 0)
+                    // ── 表头加粗 + 底色 ──
+                    if (table.Rows.Count > 0)
                     {
                         try
                         {
                             var headerRow = table.Rows[1];
-                            headerRow.Range.Font.Bold = -1;  // True
 
-                            // 跨页重复表头
+                            if (rule.Table.HeaderBold)
+                                headerRow.Range.Font.Bold = -1;
+
                             if (rule.Table.RepeatHeaderRow)
-                            {
-                                headerRow.HeadingFormat = -1; // True
-                            }
+                                headerRow.HeadingFormat = -1;
+
+                            // 首行底色（在 ClearAllTextBackground 之后单独调用，此处移除）
                         }
                         catch { /* 忽略 */ }
                     }
@@ -605,7 +659,90 @@ namespace DocuFormatPro.Services
             }
         }
 
+        /// <summary>在清除背景色之后，单独为所有表格首行重新应用底色</summary>
+        private void ApplyTableHeaderShading(Document doc, TableSettings ts)
+        {
+            WdColor fillColor = ParseHexToWdColor(ts.HeaderShadingColorHex);
+
+            foreach (Table table in doc.Tables)
+            {
+                try
+                {
+                    if (table.Rows.Count == 0) continue;
+
+                    // 清除表格样式标志，避免 Word 内置表格样式覆盖我们设置的底色
+                    try
+                    {
+                        table.ApplyStyleHeadingRows = false;
+                        table.ApplyStyleFirstColumn = false;
+                        table.ApplyStyleLastColumn = false;
+                        table.ApplyStyleRowBands = false;
+                        table.ApplyStyleColumnBands = false;
+                    }
+                    catch { }
+
+                    Row headerRow = table.Rows[1];
+                    ApplyHeaderRowShading(headerRow, fillColor);
+
+                    foreach (Cell cell in headerRow.Cells)
+                    {
+                        try
+                        {
+                            // 先清除高亮
+                            cell.Range.HighlightColorIndex = WdColorIndex.wdNoHighlight;
+
+                            // 设置单元格底色
+                            ApplySolidShading(cell.Shading, fillColor);
+                            cell.Range.HighlightColorIndex = WdColorIndex.wdNoHighlight;
+                            ApplySolidShading(cell.Shading, fillColor);
+                            ApplySolidShading(cell.Range.Shading, fillColor);
+                            ApplySolidShading(cell.Range.Font.Shading, fillColor);
+
+                            foreach (Paragraph paragraph in cell.Range.Paragraphs)
+                            {
+                                try
+                                {
+                                    ApplySolidShading(paragraph.Range.Shading, fillColor);
+                                    ApplySolidShading(paragraph.Range.Font.Shading, fillColor);
+                                }
+                                catch { }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch { continue; }
+            }
+        }
+
         /// <summary>应用表格边框</summary>
+        private void ApplyHeaderRowShading(Row headerRow, WdColor fillColor)
+        {
+            foreach (Cell cell in headerRow.Cells)
+            {
+                try
+                {
+                    cell.Range.HighlightColorIndex = WdColorIndex.wdNoHighlight;
+
+                    ApplySolidShading(cell.Shading, fillColor);
+                    ApplySolidShading(cell.Range.Shading, fillColor);
+                    ApplySolidShading(cell.Range.Font.Shading, fillColor);
+
+                    foreach (Paragraph paragraph in cell.Range.Paragraphs)
+                    {
+                        try
+                        {
+                            paragraph.Range.HighlightColorIndex = WdColorIndex.wdNoHighlight;
+                            ApplySolidShading(paragraph.Range.Shading, fillColor);
+                            ApplySolidShading(paragraph.Range.Font.Shading, fillColor);
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+        }
+
         private void ApplyTableBorders(Table table, TableSettings ts)
         {
             if (ts.BorderStyle == TableBorderStyle.None)
@@ -654,6 +791,20 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>应用行距设置</summary>
+        private static void ClearShading(Shading shading)
+        {
+            shading.Texture = WdTextureIndex.wdTextureNone;
+            shading.BackgroundPatternColor = WdColor.wdColorWhite;
+            shading.ForegroundPatternColor = WdColor.wdColorWhite;
+        }
+
+        private static void ApplySolidShading(Shading shading, WdColor fillColor)
+        {
+            shading.Texture = WdTextureIndex.wdTextureNone;
+            shading.BackgroundPatternColor = fillColor;
+            shading.ForegroundPatternColor = fillColor;
+        }
+
         private void ApplyLineSpacing(ParagraphFormat pf, LineSpacingType type, float value)
         {
             switch (type)
@@ -683,6 +834,84 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>将十六进制颜色字符串转换为 WdColor（Word COM 使用 BGR 格式）</summary>
+        private void EnsureDocxHeaderCellShading(string docxPath, string? colorHex)
+        {
+            if (!System.IO.File.Exists(docxPath)) return;
+
+            string fillHex = NormalizeHexColor(colorHex);
+
+            using ZipArchive archive = ZipFile.Open(docxPath, ZipArchiveMode.Update);
+            ZipArchiveEntry? documentEntry = archive.GetEntry("word/document.xml");
+            if (documentEntry == null) return;
+
+            XDocument documentXml;
+            using (Stream stream = documentEntry.Open())
+            {
+                documentXml = XDocument.Load(stream);
+            }
+
+            XNamespace w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+            XName tblName = w + "tbl";
+            XName trName = w + "tr";
+            XName tcName = w + "tc";
+            XName tcPrName = w + "tcPr";
+            XName shdName = w + "shd";
+
+            XName valAttr = w + "val";
+            XName colorAttr = w + "color";
+            XName fillAttr = w + "fill";
+
+            foreach (XElement table in documentXml.Descendants(tblName))
+            {
+                XElement? headerRow = table.Elements(trName).FirstOrDefault();
+                if (headerRow == null) continue;
+
+                foreach (XElement cell in headerRow.Elements(tcName))
+                {
+                    XElement? tcPr = cell.Element(tcPrName);
+                    if (tcPr == null)
+                    {
+                        tcPr = new XElement(tcPrName);
+                        cell.AddFirst(tcPr);
+                    }
+
+                    foreach (XElement innerShading in cell.Descendants(shdName)
+                                 .Where(shading => shading.Parent?.Name != tcPrName)
+                                 .ToList())
+                    {
+                        innerShading.Remove();
+                    }
+
+                    XElement? cellShading = tcPr.Element(shdName);
+                    if (cellShading == null)
+                    {
+                        cellShading = new XElement(shdName);
+                        tcPr.Add(cellShading);
+                    }
+
+                    cellShading.SetAttributeValue(valAttr, "clear");
+                    cellShading.SetAttributeValue(colorAttr, "auto");
+                    cellShading.SetAttributeValue(fillAttr, fillHex);
+                }
+            }
+
+            documentEntry.Delete();
+            ZipArchiveEntry newDocumentEntry = archive.CreateEntry("word/document.xml");
+            using Stream outputStream = newDocumentEntry.Open();
+            documentXml.Save(outputStream, SaveOptions.DisableFormatting);
+        }
+
+        private static string NormalizeHexColor(string? hex)
+        {
+            if (string.IsNullOrWhiteSpace(hex)) return "D9D9D9";
+
+            string cleanHex = hex.Trim().TrimStart('#');
+            if (cleanHex.Length != 6 || !Regex.IsMatch(cleanHex, "^[0-9a-fA-F]{6}$"))
+                return "D9D9D9";
+
+            return cleanHex.ToUpperInvariant();
+        }
+
         private WdColor ParseHexToWdColor(string? hex)
         {
             if (string.IsNullOrWhiteSpace(hex)) return WdColor.wdColorBlack;

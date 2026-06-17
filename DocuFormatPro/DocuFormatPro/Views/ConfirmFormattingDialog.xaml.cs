@@ -47,8 +47,8 @@ namespace DocuFormatPro.Views
             AddSectionTitle(RulesPanel, "📊 表格与题注");
             if (rule.Table.ApplyTableFormatting)
             {
-                AddItem(RulesPanel, $"✅ 应用表格样式：{(rule.Table.UseSameAsBody ? "字体与正文一致" : "独立字体")}，{(rule.Table.HeaderBold ? "表头加粗" : "表头不加粗")}，{(rule.Table.RepeatHeaderRow ? "跨页重复表头" : "")}");
-                AddItem(RulesPanel, $"   行距：{DescribeLineSpacing(rule.Table.LineSpacingType, rule.Table.LineSpacingValue)}，边框：黑色单细线");
+                AddItem(RulesPanel, $"✅ 应用表格样式：{rule.Table.ChineseFontName} {rule.Table.FontSizeName}，{(rule.Table.HeaderBold ? "表头加粗" : "表头不加粗")}，{(rule.Table.RepeatHeaderRow ? "跨页重复表头" : "")}");
+                AddItem(RulesPanel, $"   行距：{DescribeLineSpacing(rule.Table.LineSpacingType, rule.Table.LineSpacingValue)}，边框：黑色单细线{(rule.Table.UseHeaderShading ? $"，首行底色 {rule.Table.HeaderShadingColorHex}" : "")}");
             }
             else
             {

@@ -17,6 +17,7 @@ namespace DocuFormatPro.Models
         private List<HeadingStyle> _headings = new();
         private FrontMatterSettings _frontMatter = new();
         private HeadingNumberingSettings _headingNumbering = new();
+        private bool _normalizeBodyText = true;
 
         /// <summary>规则/模板名称</summary>
         public string RuleName
@@ -74,6 +75,13 @@ namespace DocuFormatPro.Models
             set { _headingNumbering = value; OnPropertyChanged(); }
         }
 
+        /// <summary>是否规范化正文文本（去除中英文空格、英文标点转中文全角）</summary>
+        public bool NormalizeBodyText
+        {
+            get => _normalizeBodyText;
+            set { _normalizeBodyText = value; OnPropertyChanged(); }
+        }
+
         /// <summary>
         /// 返回包含用户指定默认值的排版规则
         /// </summary>
@@ -107,17 +115,22 @@ namespace DocuFormatPro.Models
                 },
                 Table = new TableSettings
                 {
-                    UseSameAsBody = true,
                     HeaderBold = true,
+                    ChineseFontName = "宋体",
+                    EnglishFontName = "Times New Roman",
+                    FontSizePoint = 10.5f,
+                    FontSizeName = "五号",
                     SpaceBeforeLines = 0f,
                     SpaceAfterLines = 0f,
                     LineSpacingType = LineSpacingType.Fixed,
-                    LineSpacingValue = 18f,  // 固定值 18 磅
+                    LineSpacingValue = 18f,
                     BorderStyle = TableBorderStyle.SingleThin,
                     BorderColorHex = "#000000",
                     CellVerticalAlignment = CellVerticalAlign.Center,
                     CellHorizontalAlignment = CellHorizontalAlign.Center,
-                    RepeatHeaderRow = true
+                    RepeatHeaderRow = true,
+                    UseHeaderShading = true,
+                    HeaderShadingColorHex = "#D9D9D9"
                 },
                 Headings = new List<HeadingStyle>
                 {
@@ -243,8 +256,11 @@ namespace DocuFormatPro.Models
     {
         private bool _applyTableFormatting = false;
         private bool _applyTableCaptions = false;
-        private bool _useSameAsBody = true;
         private bool _headerBold = true;
+        private string _chineseFontName = "宋体";
+        private string _englishFontName = "Times New Roman";
+        private float _fontSizePoint = 10.5f;
+        private string _fontSizeName = "五号";
         private float _spaceBeforeLines;
         private float _spaceAfterLines;
         private LineSpacingType _lineSpacingType = LineSpacingType.Fixed;
@@ -254,15 +270,23 @@ namespace DocuFormatPro.Models
         private CellVerticalAlign _cellVerticalAlignment = CellVerticalAlign.Center;
         private CellHorizontalAlign _cellHorizontalAlignment = CellHorizontalAlign.Center;
         private bool _repeatHeaderRow = true;
+        private bool _useHeaderShading = true;
+        private string _headerShadingColorHex = "#D9D9D9";
 
         /// <summary>是否应用表格样式格式化</summary>
         public bool ApplyTableFormatting { get => _applyTableFormatting; set { _applyTableFormatting = value; OnPropertyChanged(); } }
         /// <summary>是否自动处理表格和图片题注</summary>
         public bool ApplyTableCaptions { get => _applyTableCaptions; set { _applyTableCaptions = value; OnPropertyChanged(); } }
-        /// <summary>字体是否与正文一致</summary>
-        public bool UseSameAsBody { get => _useSameAsBody; set { _useSameAsBody = value; OnPropertyChanged(); } }
         /// <summary>表头行加粗</summary>
         public bool HeaderBold { get => _headerBold; set { _headerBold = value; OnPropertyChanged(); } }
+        /// <summary>表格中文字体</summary>
+        public string ChineseFontName { get => _chineseFontName; set { _chineseFontName = value; OnPropertyChanged(); } }
+        /// <summary>表格英文字体</summary>
+        public string EnglishFontName { get => _englishFontName; set { _englishFontName = value; OnPropertyChanged(); } }
+        /// <summary>表格字号（磅值）</summary>
+        public float FontSizePoint { get => _fontSizePoint; set { _fontSizePoint = value; OnPropertyChanged(); } }
+        /// <summary>表格字号名称</summary>
+        public string FontSizeName { get => _fontSizeName; set { _fontSizeName = value; OnPropertyChanged(); } }
         public float SpaceBeforeLines { get => _spaceBeforeLines; set { _spaceBeforeLines = value; OnPropertyChanged(); } }
         public float SpaceAfterLines { get => _spaceAfterLines; set { _spaceAfterLines = value; OnPropertyChanged(); } }
         public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); } }
@@ -273,6 +297,10 @@ namespace DocuFormatPro.Models
         public CellHorizontalAlign CellHorizontalAlignment { get => _cellHorizontalAlignment; set { _cellHorizontalAlignment = value; OnPropertyChanged(); } }
         /// <summary>跨页时重复显示表头</summary>
         public bool RepeatHeaderRow { get => _repeatHeaderRow; set { _repeatHeaderRow = value; OnPropertyChanged(); } }
+        /// <summary>是否为首行设置底色</summary>
+        public bool UseHeaderShading { get => _useHeaderShading; set { _useHeaderShading = value; OnPropertyChanged(); } }
+        /// <summary>首行底色（十六进制）</summary>
+        public string HeaderShadingColorHex { get => _headerShadingColorHex; set { _headerShadingColorHex = value; OnPropertyChanged(); } }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
