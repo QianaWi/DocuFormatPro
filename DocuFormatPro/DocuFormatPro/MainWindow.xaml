@@ -141,7 +141,7 @@
                                 <UniformGrid Columns="2">
                                     <StackPanel Margin="0,0,4,6">
                                         <TextBlock Text="行距类型" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
-                                        <ComboBox ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" SelectedIndex="3" SelectionChanged="BodyLineSpacingType_Changed"/>
+                                        <ComboBox ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" SelectedIndex="1" SelectionChanged="BodyLineSpacingType_Changed"/>
                                     </StackPanel>
                                     <StackPanel Margin="4,0,0,6">
                                         <TextBlock Text="行距值" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>

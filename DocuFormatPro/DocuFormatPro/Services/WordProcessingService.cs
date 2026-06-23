@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
@@ -35,6 +36,13 @@ namespace DocuFormatPro.Services
                     Document? doc = null;
                     try
                     {
+                        var stepTimer = Stopwatch.StartNew();
+                        void ReportStepDone(string stepName)
+                        {
+                            progress?.Report($"{stepName}完成，用时 {stepTimer.Elapsed.TotalSeconds:F1} 秒");
+                            stepTimer.Restart();
+                        }
+
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // 每次处理在当前 STA 线程内创建独立的 Word Application 实例
@@ -45,6 +53,13 @@ namespace DocuFormatPro.Services
                             ScreenUpdating = false,
                             DisplayAlerts = WdAlertLevel.wdAlertsNone
                         };
+                        try
+                        {
+                            wordApp.Options.CheckSpellingAsYouType = false;
+                            wordApp.Options.CheckGrammarAsYouType = false;
+                            wordApp.Options.Pagination = false;
+                        }
+                        catch { }
 
                         progress?.Report($"正在打开文档: {System.IO.Path.GetFileName(filePath)}");
 
@@ -52,22 +67,33 @@ namespace DocuFormatPro.Services
                             FileName: filePath,
                             ReadOnly: false,
                             Visible: false);
+                        try
+                        {
+                            doc.ShowSpellingErrors = false;
+                            doc.ShowGrammaticalErrors = false;
+                        }
+                        catch { }
+                        string inputExtension = System.IO.Path.GetExtension(filePath);
+                        bool isDocxDocument = string.Equals(inputExtension, ".docx", StringComparison.OrdinalIgnoreCase);
 
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 1. 设置页边距 =====
                         progress?.Report("正在标准化页边距...");
                         SetPageMargins(wordApp, doc, rule);
+                        ReportStepDone("页边距");
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 2. 设置正文样式 =====
                         progress?.Report("正在设置正文格式...");
                         ApplyBodyTextStyle(doc, rule);
+                        ReportStepDone("正文样式");
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 3. 设置标题样式 =====
                         progress?.Report("正在设置标题格式...");
-                        ApplyHeadingStyles(doc, rule);
+                        ApplyHeadingStyles(doc, rule, resetDirectFormatting: !isDocxDocument);
+                        ReportStepDone("标题样式");
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 3b. 标题自动编号 =====
@@ -75,42 +101,51 @@ namespace DocuFormatPro.Services
                         {
                             progress?.Report("正在处理标题编号...");
                             ApplyHeadingNumbering(doc, rule.HeadingNumbering);
+                            ReportStepDone("标题编号");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
 
                         // ===== 4. 逐段落应用格式 =====
                         progress?.Report("正在处理段落格式...");
-                        ApplyParagraphFormatting(doc, rule);
-                        cancellationToken.ThrowIfCancellationRequested();
-
                         // ===== 5. 格式化表格 =====
+                        if (!isDocxDocument)
+                        {
+                            ApplyParagraphFormatting(doc, rule);
+                            ReportStepDone("段落格式");
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+
                         if (rule.Table.ApplyTableFormatting)
                         {
                             progress?.Report("正在重塑表格...");
-                            FormatAllTables(doc, rule);
+                            FormatAllTablesFast(doc, rule, isDocxDocument);
+                            ReportStepDone("表格格式");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
 
                         // ===== 6. 清除所有文字背景色 =====
                         progress?.Report("正在清除文字背景色...");
-                        // 未勾选"应用表格样式"时，跳过所有表格单元格，保留用户已有的表格底色
-                        bool skipAllTableCells = !rule.Table.ApplyTableFormatting;
+                        // 如果启用了首行底色，跳过首行单元格，避免清除后再设置的竞争问题
                         bool skipFirstRow = rule.Table.ApplyTableFormatting && rule.Table.UseHeaderShading;
-                        ClearAllTextBackground(doc, skipFirstRow, skipAllTableCells);
+                        if (!isDocxDocument)
+                            ClearAllTextBackground(doc, skipFirstRow);
+                        ReportStepDone("背景清理");
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 6b. 重新应用首行底色（在清除背景后执行，避免被覆盖）=====
-                        if (rule.Table.ApplyTableFormatting && rule.Table.UseHeaderShading)
+                        if (rule.Table.ApplyTableFormatting && rule.Table.UseHeaderShading && !isDocxDocument)
                         {
                             progress?.Report("正在设置表格首行底色...");
                             ApplyTableHeaderShading(doc, rule.Table);
+                            ReportStepDone("表头底色");
                         }
 
                         // ===== 6b. 规范化正文文本 =====
-                        if (rule.NormalizeBodyText)
+                        if (rule.NormalizeBodyText && !isDocxDocument)
                         {
                             var normalizer = new TextNormalizationService();
                             normalizer.NormalizeBodyText(doc, progress);
+                            ReportStepDone("文本规范化");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
 
@@ -120,6 +155,7 @@ namespace DocuFormatPro.Services
                             progress?.Report("正在处理题注...");
                             var captionService = new CaptionService();
                             captionService.ProcessCaptions(doc, progress);
+                            ReportStepDone("题注");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
 
@@ -128,6 +164,7 @@ namespace DocuFormatPro.Services
                         {
                             progress?.Report("正在插入封面与前置页...");
                             InsertFrontMatterPages(wordApp, doc, rule.FrontMatter.TemplateFilePath);
+                            ReportStepDone("前置页");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
 
@@ -139,15 +176,18 @@ namespace DocuFormatPro.Services
 
                         progress?.Report("正在保存文档...");
                         doc.SaveAs2(FileName: outputPath);
-                        if (rule.Table.ApplyTableFormatting &&
-                            rule.Table.UseHeaderShading &&
-                            string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase))
+                        ReportStepDone("保存");
+                        if (string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase))
                         {
                             doc.Close(WdSaveOptions.wdDoNotSaveChanges);
                             Marshal.ReleaseComObject(doc);
                             doc = null;
 
-                            EnsureDocxHeaderCellShading(outputPath, rule.Table.HeaderShadingColorHex);
+                            EnsureDocxPostProcessing(
+                                outputPath,
+                                rule,
+                                normalizeBodyText: rule.NormalizeBodyText);
+                            ReportStepDone("docx 快速后处理");
                         }
 
                         progress?.Report($"文档处理完成: {System.IO.Path.GetFileName(outputPath)}");
@@ -245,22 +285,29 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>设置标题内置样式，并清除段落级直接格式确保样式生效</summary>
-        private void ApplyHeadingStyles(Document doc, FormattingRule rule)
+        private void ApplyHeadingStyles(Document doc, FormattingRule rule, bool resetDirectFormatting = true)
         {
             var builtinMap = new Dictionary<int, WdBuiltinStyle>
             {
                 { 1, WdBuiltinStyle.wdStyleHeading1 },
                 { 2, WdBuiltinStyle.wdStyleHeading2 },
-                { 3, WdBuiltinStyle.wdStyleHeading3 }
+                { 3, WdBuiltinStyle.wdStyleHeading3 },
+                { 4, WdBuiltinStyle.wdStyleHeading4 },
+                { 5, WdBuiltinStyle.wdStyleHeading5 },
+                { 6, WdBuiltinStyle.wdStyleHeading6 },
+                { 7, WdBuiltinStyle.wdStyleHeading7 },
+                { 8, WdBuiltinStyle.wdStyleHeading8 },
+                { 9, WdBuiltinStyle.wdStyleHeading9 }
             };
 
             if (rule.Headings == null) return;
 
-            foreach (var heading in rule.Headings)
+            for (int headingLevel = 1; headingLevel <= 9; headingLevel++)
             {
+                var heading = ResolveHeadingFormat(rule, headingLevel);
                 if (heading == null) continue;
 
-                if (!builtinMap.TryGetValue(heading.Level, out var builtinStyle))
+                if (!builtinMap.TryGetValue(headingLevel, out var builtinStyle))
                     continue;
 
                 try
@@ -292,18 +339,24 @@ namespace DocuFormatPro.Services
                     // 段前段后（固定 6pt）
                     style.ParagraphFormat.SpaceBeforeAuto = 0;
                     style.ParagraphFormat.SpaceAfterAuto = 0;
-                    style.ParagraphFormat.SpaceBefore = 6f;
-                    style.ParagraphFormat.SpaceAfter = 6f;
+                    style.ParagraphFormat.SpaceBefore = heading.SpaceBeforeLines * 12f;
+                    style.ParagraphFormat.SpaceAfter = heading.SpaceAfterLines * 12f;
+                    style.ParagraphFormat.FirstLineIndent = 0;
+                    style.ParagraphFormat.CharacterUnitFirstLineIndent = 0;
+                    style.ParagraphFormat.LeftIndent = 0;
+                    style.ParagraphFormat.CharacterUnitLeftIndent = 0;
                 }
                 catch { continue; }
             }
 
             // 遍历所有标题段落，清除直接格式（direct formatting），强制让样式定义生效
             // 不清除直接格式时，段落级覆盖会屏蔽样式修改，需手动点击样式才能刷新
+            if (!resetDirectFormatting) return;
+
             var headingStyleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "标题 1", "标题 2", "标题 3",
-                "Heading 1", "Heading 2", "Heading 3"
+                "标题 1", "标题 2", "标题 3", "标题 4", "标题 5", "标题 6", "标题 7", "标题 8", "标题 9",
+                "Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5", "Heading 6", "Heading 7", "Heading 8", "Heading 9"
             };
 
             foreach (Paragraph para in doc.Paragraphs)
@@ -331,12 +384,36 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>为标题样式绑定多级列表，实现自动编号（新增/移动标题后编号自动更新）</summary>
+        private DocuFormatPro.Models.HeadingStyle? ResolveHeadingFormat(FormattingRule rule, int level)
+        {
+            if (rule.Headings == null || rule.Headings.Count == 0) return null;
+
+            DocuFormatPro.Models.HeadingStyle? exact = rule.Headings.FirstOrDefault(h => h.Level == level);
+            if (exact != null) return exact;
+
+            int fallbackLevel = level >= 4 ? 3 : level;
+            return rule.Headings.FirstOrDefault(h => h.Level == fallbackLevel)
+                ?? rule.Headings.ElementAtOrDefault(Math.Max(0, fallbackLevel - 1))
+                ?? rule.Headings.LastOrDefault();
+        }
+
+        private static string BuildNumberFormat(int level)
+            => string.Join(".", Enumerable.Range(1, Math.Clamp(level, 1, 9)).Select(i => $"%{i}"));
+
+        private static int GetHeadingLevelFromStyleName(string? styleName)
+        {
+            if (string.IsNullOrWhiteSpace(styleName)) return 0;
+
+            var match = Regex.Match(styleName, @"(?:Heading|标题)\s*([1-9])", RegexOptions.IgnoreCase);
+            return match.Success ? int.Parse(match.Groups[1].Value) : 0;
+        }
+
         private void ApplyHeadingNumbering(Document doc, HeadingNumberingSettings settings)
         {
             var headingStyleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "标题 1", "标题 2", "标题 3",
-                "Heading 1", "Heading 2", "Heading 3"
+                "标题 1", "标题 2", "标题 3", "标题 4", "标题 5", "标题 6", "标题 7", "标题 8", "标题 9",
+                "Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5", "Heading 6", "Heading 7", "Heading 8", "Heading 9"
             };
 
             // 如果选择去除现有编号前缀，先剥离文字中的旧编号
@@ -371,7 +448,7 @@ namespace DocuFormatPro.Services
                 // 创建多级列表模板
                 var lt = doc.ListTemplates.Add(OutlineNumbered: true);
 
-                for (int level = 1; level <= 3; level++)
+                for (int level = 1; level <= 9; level++)
                 {
                     var ll = lt.ListLevels[level];
                     ll.StartAt = 1;
@@ -383,7 +460,7 @@ namespace DocuFormatPro.Services
                             {
                                 1 => "%1",
                                 2 => "%1.%2",
-                                _ => "%1.%2.%3"
+                                _ => BuildNumberFormat(level)
                             };
                             ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
                             ll.TrailingCharacter = WdTrailingCharacter.wdTrailingSpace;
@@ -397,7 +474,7 @@ namespace DocuFormatPro.Services
                             }
                             else
                             {
-                                ll.NumberFormat = level == 2 ? "%1.%2" : "%1.%2.%3";
+                                ll.NumberFormat = BuildNumberFormat(level);
                                 ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
                             }
                             ll.TrailingCharacter = WdTrailingCharacter.wdTrailingSpace;
@@ -414,9 +491,14 @@ namespace DocuFormatPro.Services
                                 ll.NumberFormat = "（%2）";
                                 ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
                             }
-                            else
+                            else if (level == 3)
                             {
                                 ll.NumberFormat = "%3.";
+                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                            }
+                            else
+                            {
+                                ll.NumberFormat = BuildNumberFormat(level);
                                 ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
                             }
                             ll.TrailingCharacter = WdTrailingCharacter.wdTrailingTab;
@@ -438,16 +520,15 @@ namespace DocuFormatPro.Services
                         if (!headingStyleNames.Contains(styleName)) continue;
 
                         // 根据样式名确定级别
-                        int level = 1;
-                        if (styleName.Contains("2")) level = 2;
-                        else if (styleName.Contains("3")) level = 3;
+                        int headingLevel = GetHeadingLevelFromStyleName(styleName);
+                        if (headingLevel == 0) continue;
 
                         para.Range.ListFormat.ApplyListTemplateWithLevel(
                             lt,
                             ContinuePreviousList: true,
                             ApplyTo: WdListApplyTo.wdListApplyToWholeList,
                             DefaultListBehavior: WdDefaultListBehavior.wdWord10ListBehavior,
-                            ApplyLevel: level);
+                            ApplyLevel: headingLevel);
                     }
                     catch { continue; }
                 }
@@ -467,6 +548,13 @@ namespace DocuFormatPro.Services
                 {
                     1 => WdBuiltinStyle.wdStyleHeading1,
                     2 => WdBuiltinStyle.wdStyleHeading2,
+                    3 => WdBuiltinStyle.wdStyleHeading3,
+                    4 => WdBuiltinStyle.wdStyleHeading4,
+                    5 => WdBuiltinStyle.wdStyleHeading5,
+                    6 => WdBuiltinStyle.wdStyleHeading6,
+                    7 => WdBuiltinStyle.wdStyleHeading7,
+                    8 => WdBuiltinStyle.wdStyleHeading8,
+                    9 => WdBuiltinStyle.wdStyleHeading9,
                     _ => WdBuiltinStyle.wdStyleHeading3
                 };
                 return doc.Styles[builtinStyle].NameLocal;
@@ -485,13 +573,19 @@ namespace DocuFormatPro.Services
                 try
                 {
                     var styleName = ((Style)para.get_Style()).NameLocal;
+                    if (GetHeadingLevelFromStyleName(styleName) > 0) continue;
+
+                    var range = para.Range;
+                    bool isInTable = false;
+                    try { isInTable = (bool)range.Information[WdInformation.wdWithInTable]; } catch { }
+                    if (isInTable) continue;
+
                     bool isNormal = styleName == "正文" || styleName == "Normal"
                                     || styleName.Contains("Body");
 
                     if (isNormal)
                     {
                         // 正文段落：应用正文格式
-                        var range = para.Range;
                         range.Font.Name = rule.BodyText.ChineseFontName;
                         range.Font.NameAscii = rule.BodyText.EnglishFontName;
                         range.Font.Size = rule.BodyText.FontSizePoint;
@@ -500,19 +594,8 @@ namespace DocuFormatPro.Services
                             ? ParseHexToWdColor(rule.BodyText.FontColorHex)
                             : WdColor.wdColorBlack;
 
-                        bool isInTable = false;
-                        try { isInTable = (bool)range.Information[WdInformation.wdWithInTable]; } catch { }
-
-                        if (isInTable)
-                        {
-                            para.Format.CharacterUnitFirstLineIndent = 0;
-                            para.Format.FirstLineIndent = 0;
-                        }
-                        else
-                        {
-                            para.Format.CharacterUnitFirstLineIndent = rule.Paragraph.FirstLineIndentChars;
-                            para.Format.FirstLineIndent = 0;
-                        }
+                        para.Format.CharacterUnitFirstLineIndent = rule.Paragraph.FirstLineIndentChars;
+                        para.Format.FirstLineIndent = 0;
                         ApplyLineSpacing(para.Format, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue);
                         para.Format.SpaceBefore = rule.Paragraph.SpaceBeforeLines * 12f;
                         para.Format.SpaceAfter = rule.Paragraph.SpaceAfterLines * 12f;
@@ -523,7 +606,7 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>清除所有文字的背景色（高亮和底纹），并逐个清除表格单元格背景</summary>
-        private void ClearAllTextBackground(Document doc, bool skipFirstRowOfTables = false, bool skipAllTableCells = false)
+        private void ClearAllTextBackground(Document doc, bool skipFirstRowOfTables = false)
         {
             try
             {
@@ -534,9 +617,6 @@ namespace DocuFormatPro.Services
                 ClearShading(doc.Content.Shading);
             }
             catch { }
-
-            // 未勾选表格格式化时，跳过所有表格单元格，保留用户已设置的底色
-            if (skipAllTableCells) return;
 
             // 逐个单元格清除背景色，跳过需要保留底色的首行
             foreach (Table table in doc.Tables)
@@ -565,6 +645,66 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>格式化所有表格</summary>
+        private void FormatAllTablesFast(Document doc, FormattingRule rule, bool deferParagraphIndentReset)
+        {
+            foreach (Table table in doc.Tables)
+            {
+                try
+                {
+                    if (deferParagraphIndentReset)
+                    {
+                        try
+                        {
+                            table.PreferredWidthType = WdPreferredWidthType.wdPreferredWidthPercent;
+                            table.PreferredWidth = 100f;
+                        }
+                        catch { }
+                    }
+                    else
+                    {
+                        table.AutoFitBehavior(WdAutoFitBehavior.wdAutoFitWindow);
+                    }
+
+                    try
+                    {
+                        table.ApplyStyleHeadingRows = false;
+                        table.ApplyStyleFirstColumn = false;
+                        table.ApplyStyleLastColumn = false;
+                        table.ApplyStyleRowBands = false;
+                        table.ApplyStyleColumnBands = false;
+                    }
+                    catch { }
+
+                    try
+                    {
+                        table.Rows.HeightRule = WdRowHeightRule.wdRowHeightAtLeast;
+                        table.Rows.Height = (float)(1.0 * 28.35);
+                    }
+                    catch { }
+
+                    ApplyTableBorders(table, rule.Table);
+                    ApplyTableRangeFormatting(table, rule.Table);
+                    if (!deferParagraphIndentReset)
+                        ResetTableParagraphIndents(table);
+
+                    if (table.Rows.Count > 0)
+                    {
+                        try
+                        {
+                            Row headerRow = table.Rows[1];
+                            if (rule.Table.HeaderBold)
+                                headerRow.Range.Font.Bold = -1;
+
+                            if (rule.Table.RepeatHeaderRow)
+                                headerRow.HeadingFormat = -1;
+                        }
+                        catch { }
+                    }
+                }
+                catch { continue; }
+            }
+        }
+
         private void FormatAllTables(Document doc, FormattingRule rule)
         {
             foreach (Table table in doc.Tables)
@@ -586,7 +726,15 @@ namespace DocuFormatPro.Services
                     catch { }
 
                     // ── 所有行行高：最小值 1 厘米 ──
-                    foreach (Row row in table.Rows)
+                    try
+                    {
+                        table.Rows.HeightRule = WdRowHeightRule.wdRowHeightAtLeast;
+                        table.Rows.Height = (float)(1.0 * 28.35);
+                    }
+                    catch { }
+
+                    Row row = table.Rows[1];
+                    for (int rowIndex = 0; rowIndex < 0; rowIndex++)
                     {
                         try
                         {
@@ -598,6 +746,7 @@ namespace DocuFormatPro.Services
 
                     // ── 设置边框 ──
                     ApplyTableBorders(table, rule.Table);
+                    ApplyTableRangeFormatting(table, rule.Table);
 
                     // ── 设置单元格对齐 ──
                     foreach (Cell cell in table.Range.Cells)
@@ -664,6 +813,67 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>在清除背景色之后，单独为所有表格首行重新应用底色</summary>
+        private void ApplyTableRangeFormatting(Table table, TableSettings ts)
+        {
+            var tableRange = table.Range;
+
+            tableRange.Font.Name = ts.ChineseFontName;
+            tableRange.Font.NameAscii = ts.EnglishFontName;
+            tableRange.Font.Size = ts.FontSizePoint;
+            tableRange.Font.Bold = 0;
+            tableRange.Font.Color = WdColor.wdColorBlack;
+
+            var pf = tableRange.ParagraphFormat;
+            pf.Alignment = ts.CellHorizontalAlignment switch
+            {
+                CellHorizontalAlign.Left => WdParagraphAlignment.wdAlignParagraphLeft,
+                CellHorizontalAlign.Right => WdParagraphAlignment.wdAlignParagraphRight,
+                _ => WdParagraphAlignment.wdAlignParagraphCenter
+            };
+            pf.SpaceBefore = ts.SpaceBeforeLines * 12f;
+            pf.SpaceAfter = ts.SpaceAfterLines * 12f;
+            pf.FirstLineIndent = 0;
+            pf.CharacterUnitFirstLineIndent = 0;
+            pf.LeftIndent = 0;
+            pf.CharacterUnitLeftIndent = 0;
+            ApplyLineSpacing(pf, ts.LineSpacingType, ts.LineSpacingValue);
+
+            WdCellVerticalAlignment verticalAlignment = ts.CellVerticalAlignment switch
+            {
+                CellVerticalAlign.Top => WdCellVerticalAlignment.wdCellAlignVerticalTop,
+                CellVerticalAlign.Bottom => WdCellVerticalAlignment.wdCellAlignVerticalBottom,
+                _ => WdCellVerticalAlignment.wdCellAlignVerticalCenter
+            };
+
+            try
+            {
+                table.Range.Cells.VerticalAlignment = verticalAlignment;
+            }
+            catch
+            {
+                foreach (Cell cell in table.Range.Cells)
+                {
+                    try { cell.VerticalAlignment = verticalAlignment; }
+                    catch { }
+                }
+            }
+        }
+
+        private void ResetTableParagraphIndents(Table table)
+        {
+            foreach (Paragraph paragraph in table.Range.Paragraphs)
+            {
+                try
+                {
+                    paragraph.Format.LeftIndent = 0;
+                    paragraph.Format.CharacterUnitLeftIndent = 0;
+                    paragraph.Format.FirstLineIndent = 0;
+                    paragraph.Format.CharacterUnitFirstLineIndent = 0;
+                }
+                catch { }
+            }
+        }
+
         private void ApplyTableHeaderShading(Document doc, TableSettings ts)
         {
             WdColor fillColor = ParseHexToWdColor(ts.HeaderShadingColorHex);
@@ -838,11 +1048,14 @@ namespace DocuFormatPro.Services
         }
 
         /// <summary>将十六进制颜色字符串转换为 WdColor（Word COM 使用 BGR 格式）</summary>
-        private void EnsureDocxHeaderCellShading(string docxPath, string? colorHex)
+        private void EnsureDocxPostProcessing(
+            string docxPath,
+            FormattingRule rule,
+            bool normalizeBodyText)
         {
             if (!System.IO.File.Exists(docxPath)) return;
 
-            string fillHex = NormalizeHexColor(colorHex);
+            string fillHex = NormalizeHexColor(rule.Table.HeaderShadingColorHex);
 
             using ZipArchive archive = ZipFile.Open(docxPath, ZipArchiveMode.Update);
             ZipArchiveEntry? documentEntry = archive.GetEntry("word/document.xml");
@@ -859,14 +1072,65 @@ namespace DocuFormatPro.Services
             XName trName = w + "tr";
             XName tcName = w + "tc";
             XName tcPrName = w + "tcPr";
+            XName pName = w + "p";
+            XName pPrName = w + "pPr";
+            XName indName = w + "ind";
             XName shdName = w + "shd";
+            XName highlightName = w + "highlight";
 
             XName valAttr = w + "val";
             XName colorAttr = w + "color";
             XName fillAttr = w + "fill";
+            XName leftAttr = w + "left";
+            XName leftCharsAttr = w + "leftChars";
+            XName firstLineAttr = w + "firstLine";
+            XName firstLineCharsAttr = w + "firstLineChars";
+            XName hangingAttr = w + "hanging";
+            XName hangingCharsAttr = w + "hangingChars";
+
+            foreach (XElement highlight in documentXml.Descendants(highlightName).ToList())
+                highlight.Remove();
+
+            foreach (XElement shading in documentXml.Descendants(shdName).ToList())
+                shading.Remove();
+
+            var styleNames = BuildDocxStyleNameMap(archive, w);
+            ApplyDocxParagraphFormatting(documentXml, w, styleNames, rule, normalizeBodyText);
+
+            if (!rule.Table.ApplyTableFormatting)
+            {
+                RewriteDocumentXmlEntry(archive, documentEntry, documentXml);
+                return;
+            }
 
             foreach (XElement table in documentXml.Descendants(tblName))
             {
+                foreach (XElement paragraph in table.Descendants(pName))
+                {
+                    XElement? pPr = paragraph.Element(pPrName);
+                    if (pPr == null)
+                    {
+                        pPr = new XElement(pPrName);
+                        paragraph.AddFirst(pPr);
+                    }
+
+                    XElement? indent = pPr.Element(indName);
+                    if (indent == null)
+                    {
+                        indent = new XElement(indName);
+                        pPr.Add(indent);
+                    }
+
+                    indent.SetAttributeValue(leftAttr, "0");
+                    indent.SetAttributeValue(leftCharsAttr, "0");
+                    indent.SetAttributeValue(firstLineAttr, "0");
+                    indent.SetAttributeValue(firstLineCharsAttr, "0");
+                    indent.SetAttributeValue(hangingAttr, null);
+                    indent.SetAttributeValue(hangingCharsAttr, null);
+                }
+
+                if (!rule.Table.UseHeaderShading) continue;
+
                 XElement? headerRow = table.Elements(trName).FirstOrDefault();
                 if (headerRow == null) continue;
 
@@ -899,6 +1163,235 @@ namespace DocuFormatPro.Services
                 }
             }
 
+            RewriteDocumentXmlEntry(archive, documentEntry, documentXml);
+        }
+
+        private static Dictionary<string, string> BuildDocxStyleNameMap(ZipArchive archive, XNamespace w)
+        {
+            var styleNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            ZipArchiveEntry? stylesEntry = archive.GetEntry("word/styles.xml");
+            if (stylesEntry == null) return styleNames;
+
+            XName styleName = w + "style";
+            XName nameName = w + "name";
+            XName styleIdAttr = w + "styleId";
+            XName valAttr = w + "val";
+
+            using Stream stream = stylesEntry.Open();
+            XDocument stylesXml = XDocument.Load(stream);
+
+            foreach (XElement style in stylesXml.Descendants(styleName))
+            {
+                string? styleId = style.Attribute(styleIdAttr)?.Value;
+                string? name = style.Element(nameName)?.Attribute(valAttr)?.Value;
+                if (!string.IsNullOrWhiteSpace(styleId) && !string.IsNullOrWhiteSpace(name))
+                    styleNames[styleId] = name;
+            }
+
+            return styleNames;
+        }
+
+        private void ApplyDocxParagraphFormatting(
+            XDocument documentXml,
+            XNamespace w,
+            Dictionary<string, string> styleNames,
+            FormattingRule rule,
+            bool normalizeBodyText)
+        {
+            XName tblName = w + "tbl";
+            XName pName = w + "p";
+            XName pPrName = w + "pPr";
+            XName pStyleName = w + "pStyle";
+            XName rName = w + "r";
+            XName tName = w + "t";
+            XName valAttr = w + "val";
+
+            foreach (XElement paragraph in documentXml.Descendants(pName))
+            {
+                if (paragraph.Ancestors(tblName).Any()) continue;
+
+                XElement pPr = EnsureFirstChild(paragraph, pPrName);
+                string? styleId = pPr.Element(pStyleName)?.Attribute(valAttr)?.Value;
+                string styleName = GetDocxStyleName(styleId, styleNames);
+
+                int headingLevel = GetHeadingLevelFromStyleName(styleName);
+                if (headingLevel > 0)
+                {
+                    var heading = ResolveHeadingFormat(rule, headingLevel);
+                    if (heading != null)
+                    {
+                        ApplyParagraphProperties(pPr, w, heading.LineSpacingType, heading.LineSpacingValue, heading.SpaceBeforeLines, heading.SpaceAfterLines, 0);
+                        ApplyRunsFormatting(paragraph.Elements(rName), w, heading.ChineseFontName, heading.EnglishFontName,
+                            heading.FontSizePoint, heading.IsBold,
+                            heading.UseCustomFontColor ? NormalizeHexColor(heading.FontColorHex) : "000000");
+                    }
+
+                    continue;
+                }
+
+                if (!IsBodyStyle(styleId, styleName)) continue;
+
+                ApplyParagraphProperties(pPr, w, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue,
+                    rule.Paragraph.SpaceBeforeLines, rule.Paragraph.SpaceAfterLines, rule.Paragraph.FirstLineIndentChars);
+                ApplyRunsFormatting(paragraph.Elements(rName), w, rule.BodyText.ChineseFontName, rule.BodyText.EnglishFontName,
+                    rule.BodyText.FontSizePoint, rule.BodyText.IsBold,
+                    rule.BodyText.UseCustomFontColor ? NormalizeHexColor(rule.BodyText.FontColorHex) : "000000");
+
+                if (normalizeBodyText)
+                {
+                    foreach (XElement text in paragraph.Descendants(tName))
+                    {
+                        text.Value = TextNormalizationService.Normalize(text.Value);
+                    }
+                }
+            }
+        }
+
+        private static string GetDocxStyleName(string? styleId, Dictionary<string, string> styleNames)
+        {
+            if (string.IsNullOrWhiteSpace(styleId)) return "Normal";
+            return styleNames.TryGetValue(styleId, out string? styleName) ? styleName : styleId;
+        }
+
+        private static bool IsBodyStyle(string? styleId, string styleName)
+            => string.IsNullOrWhiteSpace(styleId)
+               || styleName.Equals("正文", StringComparison.OrdinalIgnoreCase)
+               || styleName.Equals("Normal", StringComparison.OrdinalIgnoreCase)
+               || styleName.Contains("Body", StringComparison.OrdinalIgnoreCase);
+
+        private static XElement EnsureFirstChild(XElement parent, XName childName)
+        {
+            XElement? child = parent.Element(childName);
+            if (child != null) return child;
+
+            child = new XElement(childName);
+            parent.AddFirst(child);
+            return child;
+        }
+
+        private static XElement EnsureChild(XElement parent, XName childName)
+        {
+            XElement? child = parent.Element(childName);
+            if (child != null) return child;
+
+            child = new XElement(childName);
+            parent.Add(child);
+            return child;
+        }
+
+        private static void ApplyParagraphProperties(
+            XElement pPr,
+            XNamespace w,
+            LineSpacingType lineSpacingType,
+            float lineSpacingValue,
+            float spaceBeforeLines,
+            float spaceAfterLines,
+            float firstLineIndentChars)
+        {
+            XName spacingName = w + "spacing";
+            XName indName = w + "ind";
+            XName beforeAttr = w + "before";
+            XName afterAttr = w + "after";
+            XName lineAttr = w + "line";
+            XName lineRuleAttr = w + "lineRule";
+            XName firstLineCharsAttr = w + "firstLineChars";
+            XName firstLineAttr = w + "firstLine";
+            XName hangingAttr = w + "hanging";
+            XName hangingCharsAttr = w + "hangingChars";
+
+            XElement spacing = EnsureChild(pPr, spacingName);
+            spacing.SetAttributeValue(beforeAttr, Math.Max(0, (int)Math.Round(spaceBeforeLines * 240)));
+            spacing.SetAttributeValue(afterAttr, Math.Max(0, (int)Math.Round(spaceAfterLines * 240)));
+
+            switch (lineSpacingType)
+            {
+                case LineSpacingType.Single:
+                    spacing.SetAttributeValue(lineAttr, "240");
+                    spacing.SetAttributeValue(lineRuleAttr, "auto");
+                    break;
+                case LineSpacingType.OneAndHalf:
+                    spacing.SetAttributeValue(lineAttr, "360");
+                    spacing.SetAttributeValue(lineRuleAttr, "auto");
+                    break;
+                case LineSpacingType.Double:
+                    spacing.SetAttributeValue(lineAttr, "480");
+                    spacing.SetAttributeValue(lineRuleAttr, "auto");
+                    break;
+                case LineSpacingType.Fixed:
+                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 20)));
+                    spacing.SetAttributeValue(lineRuleAttr, "exact");
+                    break;
+                case LineSpacingType.AtLeast:
+                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 20)));
+                    spacing.SetAttributeValue(lineRuleAttr, "atLeast");
+                    break;
+                default:
+                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 240)));
+                    spacing.SetAttributeValue(lineRuleAttr, "auto");
+                    break;
+            }
+
+            XElement indent = EnsureChild(pPr, indName);
+            indent.SetAttributeValue(firstLineAttr, null);
+            indent.SetAttributeValue(hangingAttr, null);
+            indent.SetAttributeValue(hangingCharsAttr, null);
+            indent.SetAttributeValue(firstLineCharsAttr, Math.Max(0, (int)Math.Round(firstLineIndentChars * 100)));
+        }
+
+        private static void ApplyRunsFormatting(
+            IEnumerable<XElement> runs,
+            XNamespace w,
+            string chineseFontName,
+            string englishFontName,
+            float fontSizePoint,
+            bool bold,
+            string colorHex)
+        {
+            XName rPrName = w + "rPr";
+            XName rFontsName = w + "rFonts";
+            XName szName = w + "sz";
+            XName szCsName = w + "szCs";
+            XName bName = w + "b";
+            XName bCsName = w + "bCs";
+            XName colorName = w + "color";
+            XName valAttr = w + "val";
+
+            XName asciiAttr = w + "ascii";
+            XName hAnsiAttr = w + "hAnsi";
+            XName eastAsiaAttr = w + "eastAsia";
+            XName csAttr = w + "cs";
+
+            string halfPoints = Math.Max(1, (int)Math.Round(fontSizePoint * 2)).ToString();
+
+            foreach (XElement run in runs)
+            {
+                XElement rPr = EnsureFirstChild(run, rPrName);
+
+                XElement rFonts = EnsureChild(rPr, rFontsName);
+                rFonts.SetAttributeValue(asciiAttr, englishFontName);
+                rFonts.SetAttributeValue(hAnsiAttr, englishFontName);
+                rFonts.SetAttributeValue(eastAsiaAttr, chineseFontName);
+                rFonts.SetAttributeValue(csAttr, englishFontName);
+
+                EnsureChild(rPr, szName).SetAttributeValue(valAttr, halfPoints);
+                EnsureChild(rPr, szCsName).SetAttributeValue(valAttr, halfPoints);
+                EnsureChild(rPr, colorName).SetAttributeValue(valAttr, colorHex);
+
+                if (bold)
+                {
+                    EnsureChild(rPr, bName).SetAttributeValue(valAttr, "1");
+                    EnsureChild(rPr, bCsName).SetAttributeValue(valAttr, "1");
+                }
+                else
+                {
+                    rPr.Element(bName)?.Remove();
+                    rPr.Element(bCsName)?.Remove();
+                }
+            }
+        }
+
+        private static void RewriteDocumentXmlEntry(ZipArchive archive, ZipArchiveEntry documentEntry, XDocument documentXml)
+        {
             documentEntry.Delete();
             ZipArchiveEntry newDocumentEntry = archive.CreateEntry("word/document.xml");
             using Stream outputStream = newDocumentEntry.Open();

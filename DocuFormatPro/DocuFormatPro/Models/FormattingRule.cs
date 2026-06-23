@@ -139,7 +139,7 @@ namespace DocuFormatPro.Models
                         Level = 1,
                         ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
-                        FontSizePoint = 15f,
+                        FontSizePoint = 15f,    // 小三 = 15pt
                         FontSizeName = "小三",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
@@ -153,7 +153,7 @@ namespace DocuFormatPro.Models
                         Level = 2,
                         ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
-                        FontSizePoint = 14f,
+                        FontSizePoint = 14f,    // 四号 = 14pt
                         FontSizeName = "四号",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
@@ -167,7 +167,7 @@ namespace DocuFormatPro.Models
                         Level = 3,
                         ChineseFontName = "宋体",
                         EnglishFontName = "Times New Roman",
-                        FontSizePoint = 12f,
+                        FontSizePoint = 12f,    // 小四 = 12pt
                         FontSizeName = "小四",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
