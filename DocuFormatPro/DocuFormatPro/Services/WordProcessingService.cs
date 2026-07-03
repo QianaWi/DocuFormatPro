@@ -144,7 +144,11 @@ namespace DocuFormatPro.Services
                         if (rule.NormalizeBodyText && !isDocxDocument)
                         {
                             var normalizer = new TextNormalizationService();
-                            normalizer.NormalizeBodyText(doc, progress);
+                            normalizer.NormalizeBodyText(
+                                doc,
+                                rule.BodyText.ChineseFontName,
+                                rule.BodyText.EnglishFontName,
+                                progress);
                             ReportStepDone("文本规范化");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
@@ -779,7 +783,7 @@ namespace DocuFormatPro.Services
                             // 段落：不缩进，水平居中，单元格垂直居中（默认）
                             cell.Range.ParagraphFormat.SpaceBefore = rule.Table.SpaceBeforeLines * 12f;
                             cell.Range.ParagraphFormat.SpaceAfter = rule.Table.SpaceAfterLines * 12f;
-                            ApplyLineSpacing(cell.Range.ParagraphFormat, rule.Table.LineSpacingType, rule.Table.LineSpacingValue);
+                            ApplyLineSpacing(cell.Range.ParagraphFormat, LineSpacingType.Single, 1f);
 
                             // 清除首行缩进（默认行为）
                             cell.Range.ParagraphFormat.FirstLineIndent = 0;
@@ -836,7 +840,7 @@ namespace DocuFormatPro.Services
             pf.CharacterUnitFirstLineIndent = 0;
             pf.LeftIndent = 0;
             pf.CharacterUnitLeftIndent = 0;
-            ApplyLineSpacing(pf, ts.LineSpacingType, ts.LineSpacingValue);
+            ApplyLineSpacing(pf, LineSpacingType.Single, 1f);
 
             WdCellVerticalAlignment verticalAlignment = ts.CellVerticalAlignment switch
             {
@@ -1125,8 +1129,14 @@ namespace DocuFormatPro.Services
                     indent.SetAttributeValue(leftCharsAttr, "0");
                     indent.SetAttributeValue(firstLineAttr, "0");
                     indent.SetAttributeValue(firstLineCharsAttr, "0");
-                    indent.SetAttributeValue(hangingAttr, null);
-                    indent.SetAttributeValue(hangingCharsAttr, null);
+                    indent.SetAttributeValue(hangingAttr, "0");
+                    indent.SetAttributeValue(hangingCharsAttr, "0");
+
+                    XElement spacing = EnsureFirstChild(paragraph, w + "spacing");
+                    spacing.SetAttributeValue(w + "before", "0");
+                    spacing.SetAttributeValue(w + "after", "0");
+                    spacing.SetAttributeValue(w + "line", "240");
+                    spacing.SetAttributeValue(w + "lineRule", "auto");
                 }
 
                 if (!rule.Table.UseHeaderShading) continue;
@@ -1224,6 +1234,7 @@ namespace DocuFormatPro.Services
                         ApplyRunsFormatting(paragraph.Elements(rName), w, heading.ChineseFontName, heading.EnglishFontName,
                             heading.FontSizePoint, heading.IsBold,
                             heading.UseCustomFontColor ? NormalizeHexColor(heading.FontColorHex) : "000000");
+                        ApplyQuotationFontOverrides(paragraph, w, heading.ChineseFontName);
                     }
 
                     continue;
@@ -1239,12 +1250,36 @@ namespace DocuFormatPro.Services
 
                 if (normalizeBodyText)
                 {
-                    foreach (XElement text in paragraph.Descendants(tName))
-                    {
-                        text.Value = TextNormalizationService.Normalize(text.Value);
-                    }
+                    NormalizeDocxParagraphText(paragraph, w);
                 }
+
+                ApplyQuotationFontOverrides(paragraph, w, rule.BodyText.ChineseFontName);
             }
+        }
+
+        private static void NormalizeDocxParagraphText(XElement paragraph, XNamespace w)
+        {
+            XName rName = w + "r";
+            XName tName = w + "t";
+
+            var runs = paragraph.Elements(rName).ToList();
+            if (runs.Count == 0) return;
+
+            string original = string.Concat(runs.SelectMany(run => run.Descendants(tName).Select(text => text.Value)));
+            if (string.IsNullOrEmpty(original)) return;
+
+            string normalized = TextNormalizationService.Normalize(original);
+            if (normalized == original) return;
+
+            XElement firstRun = runs[0];
+            firstRun.Elements(tName).Remove();
+            XElement firstText = new XElement(tName, normalized);
+            if (normalized.StartsWith(" ") || normalized.EndsWith(" "))
+                firstText.SetAttributeValue(XNamespace.Xml + "space", "preserve");
+            firstRun.Add(firstText);
+
+            foreach (XElement run in runs.Skip(1).ToList())
+                run.Remove();
         }
 
         private static string GetDocxStyleName(string? styleId, Dictionary<string, string> styleNames)
@@ -1332,10 +1367,20 @@ namespace DocuFormatPro.Services
             }
 
             XElement indent = EnsureChild(pPr, indName);
-            indent.SetAttributeValue(firstLineAttr, null);
-            indent.SetAttributeValue(hangingAttr, null);
-            indent.SetAttributeValue(hangingCharsAttr, null);
-            indent.SetAttributeValue(firstLineCharsAttr, Math.Max(0, (int)Math.Round(firstLineIndentChars * 100)));
+            if (firstLineIndentChars <= 0)
+            {
+                indent.SetAttributeValue(firstLineAttr, "0");
+                indent.SetAttributeValue(firstLineCharsAttr, "0");
+                indent.SetAttributeValue(hangingAttr, "0");
+                indent.SetAttributeValue(hangingCharsAttr, "0");
+            }
+            else
+            {
+                indent.SetAttributeValue(firstLineAttr, null);
+                indent.SetAttributeValue(hangingAttr, null);
+                indent.SetAttributeValue(hangingCharsAttr, null);
+                indent.SetAttributeValue(firstLineCharsAttr, Math.Max(0, (int)Math.Round(firstLineIndentChars * 100)));
+            }
         }
 
         private static void ApplyRunsFormatting(
@@ -1366,12 +1411,13 @@ namespace DocuFormatPro.Services
             foreach (XElement run in runs)
             {
                 XElement rPr = EnsureFirstChild(run, rPrName);
+                bool hasChineseQuotationOrPunctuation = ContainsChineseQuotationOrPunctuation(run.Value);
 
                 XElement rFonts = EnsureChild(rPr, rFontsName);
                 rFonts.SetAttributeValue(asciiAttr, englishFontName);
                 rFonts.SetAttributeValue(hAnsiAttr, englishFontName);
                 rFonts.SetAttributeValue(eastAsiaAttr, chineseFontName);
-                rFonts.SetAttributeValue(csAttr, englishFontName);
+                rFonts.SetAttributeValue(csAttr, hasChineseQuotationOrPunctuation ? chineseFontName : englishFontName);
 
                 EnsureChild(rPr, szName).SetAttributeValue(valAttr, halfPoints);
                 EnsureChild(rPr, szCsName).SetAttributeValue(valAttr, halfPoints);
@@ -1390,6 +1436,61 @@ namespace DocuFormatPro.Services
             }
         }
 
+        private static void ApplyQuotationFontOverrides(XElement paragraph, XNamespace w, string chineseFontName)
+        {
+            XName rName = w + "r";
+            XName tName = w + "t";
+            XName rPrName = w + "rPr";
+            XName rFontsName = w + "rFonts";
+            XName asciiAttr = w + "ascii";
+            XName hAnsiAttr = w + "hAnsi";
+            XName eastAsiaAttr = w + "eastAsia";
+            XName csAttr = w + "cs";
+
+            foreach (XElement run in paragraph.Elements(rName).ToList())
+            {
+                if (run.Elements().Any(e => e.Name != rPrName && e.Name != tName))
+                    continue;
+
+                XElement? textElement = run.Element(tName);
+                if (textElement == null)
+                    continue;
+
+                string text = textElement.Value;
+                if (string.IsNullOrEmpty(text) || !text.Any(IsChineseQuotationOrPunctuationChar))
+                    continue;
+
+                XElement? originalRPr = run.Element(rPrName);
+                var replacementRuns = new List<XElement>(text.Length);
+
+                foreach (char c in text)
+                {
+                    XElement replacementRun = new XElement(rName);
+                    if (originalRPr != null)
+                        replacementRun.Add(new XElement(originalRPr));
+
+                    XElement replacementText = new XElement(tName, c.ToString());
+                    if (char.IsWhiteSpace(c))
+                        replacementText.SetAttributeValue(XNamespace.Xml + "space", "preserve");
+                    replacementRun.Add(replacementText);
+
+                    if (IsChineseQuotationOrPunctuationChar(c))
+                    {
+                        XElement rFonts = EnsureChild(EnsureFirstChild(replacementRun, rPrName), rFontsName);
+                        rFonts.SetAttributeValue(asciiAttr, chineseFontName);
+                        rFonts.SetAttributeValue(hAnsiAttr, chineseFontName);
+                        rFonts.SetAttributeValue(eastAsiaAttr, chineseFontName);
+                        rFonts.SetAttributeValue(csAttr, chineseFontName);
+                    }
+
+                    replacementRuns.Add(replacementRun);
+                }
+
+                run.AddBeforeSelf(replacementRuns);
+                run.Remove();
+            }
+        }
+
         private static void RewriteDocumentXmlEntry(ZipArchive archive, ZipArchiveEntry documentEntry, XDocument documentXml)
         {
             documentEntry.Delete();
@@ -1397,6 +1498,22 @@ namespace DocuFormatPro.Services
             using Stream outputStream = newDocumentEntry.Open();
             documentXml.Save(outputStream, SaveOptions.DisableFormatting);
         }
+
+        private static bool ContainsChineseQuotationOrPunctuation(string text)
+        {
+            foreach (char c in text)
+            {
+                if (IsChineseQuotationOrPunctuationChar(c))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsChineseQuotationOrPunctuationChar(char c)
+            => c is '\u201C' or '\u201D' or '\u300C' or '\u300D' or '\u300E' or '\u300F' or '\u300A' or '\u300B'
+                or '\uFF02' or '\uFF07'
+                or '\u3001' or '\u3002' or '\uFF0C' or '\uFF1A' or '\uFF1B' or '\uFF1F' or '\uFF01';
 
         private static string NormalizeHexColor(string? hex)
         {

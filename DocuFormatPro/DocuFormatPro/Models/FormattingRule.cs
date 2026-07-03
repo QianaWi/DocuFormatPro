@@ -122,8 +122,8 @@ namespace DocuFormatPro.Models
                     FontSizeName = "五号",
                     SpaceBeforeLines = 0f,
                     SpaceAfterLines = 0f,
-                    LineSpacingType = LineSpacingType.Fixed,
-                    LineSpacingValue = 18f,
+                    LineSpacingType = LineSpacingType.Single,
+                    LineSpacingValue = 1f,
                     BorderStyle = TableBorderStyle.SingleThin,
                     BorderColorHex = "#000000",
                     CellVerticalAlignment = CellVerticalAlign.Center,
@@ -263,8 +263,8 @@ namespace DocuFormatPro.Models
         private string _fontSizeName = "五号";
         private float _spaceBeforeLines;
         private float _spaceAfterLines;
-        private LineSpacingType _lineSpacingType = LineSpacingType.Fixed;
-        private float _lineSpacingValue = 18f;
+        private LineSpacingType _lineSpacingType = LineSpacingType.Single;
+        private float _lineSpacingValue = 1f;
         private TableBorderStyle _borderStyle = TableBorderStyle.SingleThin;
         private string _borderColorHex = "#000000";
         private CellVerticalAlign _cellVerticalAlignment = CellVerticalAlign.Center;
