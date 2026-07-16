@@ -63,6 +63,45 @@ namespace DocuFormatPro.Services
             progress?.Report("文本规范化完成");
         }
 
+        public void NormalizeTableText(
+            Document doc,
+            string chineseFontName,
+            string? englishFontName = null,
+            IProgress<string>? progress = null)
+        {
+            progress?.Report("姝ｅ湪瑙勮寖鍖栬〃鏍煎唴鏂囨湰...");
+
+            foreach (Table table in doc.Tables)
+            {
+                foreach (Paragraph para in table.Range.Paragraphs)
+                {
+                    try
+                    {
+                        var r = para.Range;
+                        object unit = WdUnits.wdCharacter;
+                        object cnt = -1;
+                        r.MoveEnd(ref unit, ref cnt);
+
+                        string original = r.Text;
+                        if (string.IsNullOrEmpty(original)) continue;
+
+                        string normalized = Normalize(original);
+                        if (normalized != original)
+                            r.Text = normalized;
+
+                        if (ContainsChineseQuotationOrPunctuation(normalized))
+                        {
+                            ApplyChineseFont(r, chineseFontName, englishFontName);
+                            ApplyChineseFontToTargetCharacters(r, chineseFontName);
+                        }
+                    }
+                    catch { continue; }
+                }
+            }
+
+            progress?.Report("琛ㄦ牸鏂囨湰瑙勮寖鍖栧畬鎴?");
+        }
+
         public static string Normalize(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;

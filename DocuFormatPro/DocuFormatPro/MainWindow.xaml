@@ -227,9 +227,63 @@
                                               Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11"
                                               Tag="3" SelectionChanged="HeadingFontSize_Changed"/>
                                 </Grid>
-                                <!-- 固定参数说明 -->
-                                <TextBlock Text="英文字体：Times New Roman  ·  段前/段后：6pt  ·  行距：1.4倍"
-                                           FontSize="9.5" Foreground="#9CA3AF" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <Separator Background="#E5E7EB" Margin="0,8,0,6"/>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="46"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="1" Text="段前pt" FontSize="9.5" Foreground="#9CA3AF"/>
+                                    <TextBlock Grid.Column="2" Text="段后pt" FontSize="9.5" Foreground="#9CA3AF"/>
+                                    <TextBlock Grid.Column="3" Text="行距" FontSize="9.5" Foreground="#9CA3AF" Margin="4,0,0,0"/>
+                                    <TextBlock Grid.Column="4" Text="值" FontSize="9.5" Foreground="#9CA3AF" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="46"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="标题 1" FontSize="11" Foreground="#374151" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Text="{Binding CurrentRule.Headings[0].SpaceBeforePoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <TextBox Grid.Column="2" Text="{Binding CurrentRule.Headings[0].SpaceAfterPoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <ComboBox Grid.Column="3" ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11" SelectedIndex="1" Tag="1" SelectionChanged="HeadingLineSpacingType_Changed" Margin="0,0,4,0"/>
+                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[0].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="46"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="标题 2" FontSize="11" Foreground="#374151" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Text="{Binding CurrentRule.Headings[1].SpaceBeforePoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <TextBox Grid.Column="2" Text="{Binding CurrentRule.Headings[1].SpaceAfterPoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <ComboBox Grid.Column="3" ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11" SelectedIndex="1" Tag="2" SelectionChanged="HeadingLineSpacingType_Changed" Margin="0,0,4,0"/>
+                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[1].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="46"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="标题 3" FontSize="11" Foreground="#374151" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Text="{Binding CurrentRule.Headings[2].SpaceBeforePoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <TextBox Grid.Column="2" Text="{Binding CurrentRule.Headings[2].SpaceAfterPoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <ComboBox Grid.Column="3" ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11" SelectedIndex="1" Tag="3" SelectionChanged="HeadingLineSpacingType_Changed" Margin="0,0,4,0"/>
+                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[2].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
+                                </Grid>
+                                <TextBlock Text="英文标题字体固定 Times New Roman" FontSize="9.5" Foreground="#9CA3AF" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 <!-- 标题自动编号 -->
                                 <Separator Background="#E5E7EB" Margin="0,8,0,6"/>
                                 <CheckBox Content="启用标题自动编号" IsChecked="{Binding CurrentRule.HeadingNumbering.EnableNumbering}" Style="{StaticResource RuleCheckBoxStyle}"/>

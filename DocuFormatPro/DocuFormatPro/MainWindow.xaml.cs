@@ -150,6 +150,15 @@ namespace DocuFormatPro
                 _viewModel.SyncHeadingNumberingScheme(cb.SelectedIndex);
         }
 
+        private void HeadingLineSpacingType_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedIndex >= 0 && cb.Tag is string tag)
+            {
+                if (int.TryParse(tag, out int level))
+                    _viewModel.SyncHeadingLineSpacingTypeByLevel(level, cb.SelectedIndex);
+            }
+        }
+
         private void TableFontSize_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (sender is ComboBox cb && cb.SelectedItem is string sizeName)

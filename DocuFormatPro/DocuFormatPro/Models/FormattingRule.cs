@@ -143,8 +143,8 @@ namespace DocuFormatPro.Models
                         FontSizeName = "小三",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
-                        SpaceBeforeLines = 0f,
-                        SpaceAfterLines = 0f,
+                        SpaceBeforePoints = 12f,
+                        SpaceAfterPoints = 6f,
                         LineSpacingType = LineSpacingType.OneAndHalf,
                         LineSpacingValue = 1.5f
                     },
@@ -157,8 +157,8 @@ namespace DocuFormatPro.Models
                         FontSizeName = "四号",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
-                        SpaceBeforeLines = 0f,
-                        SpaceAfterLines = 0f,
+                        SpaceBeforePoints = 12f,
+                        SpaceAfterPoints = 6f,
                         LineSpacingType = LineSpacingType.OneAndHalf,
                         LineSpacingValue = 1.5f
                     },
@@ -171,8 +171,8 @@ namespace DocuFormatPro.Models
                         FontSizeName = "小四",
                         IsBold = true,
                         Alignment = TextAlignment.Left,
-                        SpaceBeforeLines = 0f,
-                        SpaceAfterLines = 0f,
+                        SpaceBeforePoints = 12f,
+                        SpaceAfterPoints = 6f,
                         LineSpacingType = LineSpacingType.OneAndHalf,
                         LineSpacingValue = 1.5f
                     }
@@ -319,6 +319,8 @@ namespace DocuFormatPro.Models
         private TextAlignment _alignment = TextAlignment.Left;
         private float _spaceBeforeLines = 0.5f;
         private float _spaceAfterLines = 0.5f;
+        private float _spaceBeforePoints = 12f;
+        private float _spaceAfterPoints = 6f;
         private LineSpacingType _lineSpacingType = LineSpacingType.OneAndHalf;
         private float _lineSpacingValue = 1.5f;
         private bool _useCustomFontColor = true;
@@ -333,6 +335,8 @@ namespace DocuFormatPro.Models
         public TextAlignment Alignment { get => _alignment; set { _alignment = value; OnPropertyChanged(); } }
         public float SpaceBeforeLines { get => _spaceBeforeLines; set { _spaceBeforeLines = value; OnPropertyChanged(); } }
         public float SpaceAfterLines { get => _spaceAfterLines; set { _spaceAfterLines = value; OnPropertyChanged(); } }
+        public float SpaceBeforePoints { get => _spaceBeforePoints; set { _spaceBeforePoints = value; OnPropertyChanged(); } }
+        public float SpaceAfterPoints { get => _spaceAfterPoints; set { _spaceAfterPoints = value; OnPropertyChanged(); } }
         public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); } }
         public float LineSpacingValue { get => _lineSpacingValue; set { _lineSpacingValue = value; OnPropertyChanged(); } }
         /// <summary>是否启用自定义字体颜色</summary>

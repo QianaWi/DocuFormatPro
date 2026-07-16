@@ -149,6 +149,11 @@ namespace DocuFormatPro.Services
                                 rule.BodyText.ChineseFontName,
                                 rule.BodyText.EnglishFontName,
                                 progress);
+                            normalizer.NormalizeTableText(
+                                doc,
+                                rule.Table.ChineseFontName,
+                                rule.Table.EnglishFontName,
+                                progress);
                             ReportStepDone("文本规范化");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
@@ -340,11 +345,11 @@ namespace DocuFormatPro.Services
                     // 行距
                     ApplyLineSpacing(style.ParagraphFormat, heading.LineSpacingType, heading.LineSpacingValue);
 
-                    // 段前段后（固定 6pt）
+                    // 段前段后（按标题配置的磅值）
                     style.ParagraphFormat.SpaceBeforeAuto = 0;
                     style.ParagraphFormat.SpaceAfterAuto = 0;
-                    style.ParagraphFormat.SpaceBefore = heading.SpaceBeforeLines * 12f;
-                    style.ParagraphFormat.SpaceAfter = heading.SpaceAfterLines * 12f;
+                    style.ParagraphFormat.SpaceBefore = heading.SpaceBeforePoints;
+                    style.ParagraphFormat.SpaceAfter = heading.SpaceAfterPoints;
                     style.ParagraphFormat.FirstLineIndent = 0;
                     style.ParagraphFormat.CharacterUnitFirstLineIndent = 0;
                     style.ParagraphFormat.LeftIndent = 0;
@@ -1137,6 +1142,13 @@ namespace DocuFormatPro.Services
                     spacing.SetAttributeValue(w + "after", "0");
                     spacing.SetAttributeValue(w + "line", "240");
                     spacing.SetAttributeValue(w + "lineRule", "auto");
+
+                    if (normalizeBodyText)
+                    {
+                        NormalizeDocxParagraphText(paragraph, w);
+                    }
+
+                    ApplyQuotationFontOverrides(paragraph, w, rule.Table.ChineseFontName);
                 }
 
                 if (!rule.Table.UseHeaderShading) continue;
@@ -1230,7 +1242,8 @@ namespace DocuFormatPro.Services
                     var heading = ResolveHeadingFormat(rule, headingLevel);
                     if (heading != null)
                     {
-                        ApplyParagraphProperties(pPr, w, heading.LineSpacingType, heading.LineSpacingValue, heading.SpaceBeforeLines, heading.SpaceAfterLines, 0);
+                        ApplyParagraphProperties(pPr, w, heading.LineSpacingType, heading.LineSpacingValue,
+                            heading.SpaceBeforePoints, heading.SpaceAfterPoints, 0, spacingInPoints: true);
                         ApplyRunsFormatting(paragraph.Elements(rName), w, heading.ChineseFontName, heading.EnglishFontName,
                             heading.FontSizePoint, heading.IsBold,
                             heading.UseCustomFontColor ? NormalizeHexColor(heading.FontColorHex) : "000000");
@@ -1321,7 +1334,8 @@ namespace DocuFormatPro.Services
             float lineSpacingValue,
             float spaceBeforeLines,
             float spaceAfterLines,
-            float firstLineIndentChars)
+            float firstLineIndentChars,
+            bool spacingInPoints = false)
         {
             XName spacingName = w + "spacing";
             XName indName = w + "ind";
@@ -1335,8 +1349,9 @@ namespace DocuFormatPro.Services
             XName hangingCharsAttr = w + "hangingChars";
 
             XElement spacing = EnsureChild(pPr, spacingName);
-            spacing.SetAttributeValue(beforeAttr, Math.Max(0, (int)Math.Round(spaceBeforeLines * 240)));
-            spacing.SetAttributeValue(afterAttr, Math.Max(0, (int)Math.Round(spaceAfterLines * 240)));
+            float spacingUnit = spacingInPoints ? 20f : 240f;
+            spacing.SetAttributeValue(beforeAttr, Math.Max(0, (int)Math.Round(spaceBeforeLines * spacingUnit)));
+            spacing.SetAttributeValue(afterAttr, Math.Max(0, (int)Math.Round(spaceAfterLines * spacingUnit)));
 
             switch (lineSpacingType)
             {

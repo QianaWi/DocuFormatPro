@@ -213,9 +213,9 @@ namespace DocuFormatPro.Services
 
                     // 段前段后
                     if (style.ParagraphFormat.SpaceBefore >= 0)
-                        heading.SpaceBeforeLines = (float)Math.Round(style.ParagraphFormat.SpaceBefore / 12f, 1);
+                        heading.SpaceBeforePoints = (float)Math.Round(style.ParagraphFormat.SpaceBefore, 1);
                     if (style.ParagraphFormat.SpaceAfter >= 0)
-                        heading.SpaceAfterLines = (float)Math.Round(style.ParagraphFormat.SpaceAfter / 12f, 1);
+                        heading.SpaceAfterPoints = (float)Math.Round(style.ParagraphFormat.SpaceAfter, 1);
 
                     rule.Headings.Add(heading);
                 }

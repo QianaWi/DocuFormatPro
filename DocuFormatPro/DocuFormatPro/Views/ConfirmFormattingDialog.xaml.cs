@@ -39,7 +39,7 @@ namespace DocuFormatPro.Views
                 foreach (var h in rule.Headings)
                 {
                     string colorNote = h.UseCustomFontColor ? $"，颜色 {h.FontColorHex}" : "";
-                    AddItem(RulesPanel, $"标题 {h.Level}：{h.ChineseFontName}，{h.FontSizeName}，{DescribeAlignment(h.Alignment)}{(h.IsBold ? "，加粗" : "")}{colorNote}");
+                    AddItem(RulesPanel, $"标题 {h.Level}：{h.ChineseFontName}，{h.FontSizeName}，{DescribeAlignment(h.Alignment)}{(h.IsBold ? "，加粗" : "")}{colorNote}，段前 {h.SpaceBeforePoints}pt，段后 {h.SpaceAfterPoints}pt，行距 {DescribeLineSpacing(h.LineSpacingType, h.LineSpacingValue)}");
                 }
             }
 

@@ -461,6 +461,23 @@ namespace DocuFormatPro.ViewModels
             };
         }
 
+        public void SyncHeadingLineSpacingTypeByLevel(int level, int index)
+        {
+            var heading = CurrentRule.Headings?.FirstOrDefault(h => h.Level == level);
+            if (heading == null) return;
+
+            heading.LineSpacingType = index switch
+            {
+                0 => LineSpacingType.Single,
+                1 => LineSpacingType.OneAndHalf,
+                2 => LineSpacingType.Double,
+                3 => LineSpacingType.Multiple,
+                4 => LineSpacingType.Fixed,
+                5 => LineSpacingType.AtLeast,
+                _ => LineSpacingType.OneAndHalf
+            };
+        }
+
         /// <summary>同步表格字号</summary>
         public void SyncTableFontSize(string sizeName)
         {
