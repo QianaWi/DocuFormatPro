@@ -65,6 +65,7 @@ namespace DocuFormatPro.ViewModels
             {
                 "单倍行距", "1.5倍行距", "双倍行距", "多倍行距", "固定值", "最小值"
             };
+            LineSpacingUnits = new ObservableCollection<string> { "行（倍数）", "磅（pt）" };
             AlignmentTypes = new ObservableCollection<string>
             {
                 "左对齐", "居中", "右对齐", "两端对齐"
@@ -73,10 +74,12 @@ namespace DocuFormatPro.ViewModels
             {
                 "1 / 1.1 / 1.1.1（数字层级）",
                 "第X章 / 1.1 / 1.1.1",
-                "一、/（一）/ 1.（传统公文）"
+                "一、/（一）/ 1. /（1）/ 1）...（传统公文，8级）"
             };
 
             // 初始化命令
+            HeadingNumberingSchemes.Add("1. / 1.1. / 1.1.1.（带句号数字层级）");
+
             AddFilesCommand = new RelayCommand(_ => AddFiles(), _ => !IsProcessing);
             RemoveFileCommand = new RelayCommand(param => RemoveFile(param), _ => !IsProcessing);
             StartProcessingCommand = new RelayCommand(_ => _ = StartProcessingAsync(), _ => HasFiles && !IsProcessing);
@@ -99,6 +102,7 @@ namespace DocuFormatPro.ViewModels
         public ObservableCollection<string> EnglishFontNames { get; }
         public ObservableCollection<string> FontSizeNames { get; }
         public ObservableCollection<string> LineSpacingTypes { get; }
+        public ObservableCollection<string> LineSpacingUnits { get; }
         public ObservableCollection<string> AlignmentTypes { get; }
         public ObservableCollection<string> HeadingNumberingSchemes { get; }
 
@@ -457,6 +461,7 @@ namespace DocuFormatPro.ViewModels
             {
                 1 => HeadingNumberingScheme.ChapterNumeric,
                 2 => HeadingNumberingScheme.Traditional,
+                3 => HeadingNumberingScheme.NumericWithPeriod,
                 _ => HeadingNumberingScheme.Numeric
             };
         }
@@ -476,6 +481,12 @@ namespace DocuFormatPro.ViewModels
                 5 => LineSpacingType.AtLeast,
                 _ => LineSpacingType.OneAndHalf
             };
+        }
+
+        public void SyncHeadingLineSpacingUnitByLevel(int level, int index)
+        {
+            var heading = CurrentRule.Headings?.FirstOrDefault(h => h.Level == level);
+            if (heading != null) heading.LineSpacingUnit = index == 1 ? LineSpacingUnit.Points : LineSpacingUnit.Lines;
         }
 
         /// <summary>同步表格字号</summary>

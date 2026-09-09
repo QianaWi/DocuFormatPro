@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:DocuFormatPro.Converters"
         Title="DocuFormat Pro — 自动化 Word 排版工具"
-        Width="1150" Height="750" MinWidth="950" MinHeight="620"
+        Width="1400" Height="900" MinWidth="1120" MinHeight="700"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BgPrimaryBrush}"
         AllowDrop="True" Drop="Window_Drop" DragEnter="Window_DragEnter"
@@ -25,11 +25,8 @@
         </Grid.RowDefinitions>
 
         <!-- ========== HEADER ========== -->
-        <Border Grid.Row="0" Background="{StaticResource HeaderGradientBrush}"
-                CornerRadius="0,0,20,20" Padding="28,18,28,16">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="24" ShadowDepth="4" Direction="270" Color="#1A1A2E" Opacity="0.2"/>
-            </Border.Effect>
+        <Border Grid.Row="0" Background="#172033"
+                CornerRadius="0,0,16,16" Padding="28,18,28,18">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -45,7 +42,7 @@
                         <TextBlock Text="自动化 Word 排版工具" FontSize="10.5" Foreground="#9CA3AF" FontFamily="Microsoft YaHei UI" Margin="0,1,0,0"/>
                     </StackPanel>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                     <Border Style="{StaticResource BadgeStyle}">
                         <TextBlock Text="📐 页边距" Style="{StaticResource BadgeTextStyle}"/>
                     </Border>
@@ -56,25 +53,103 @@
                         <TextBlock Text="📊 表格重塑" Style="{StaticResource BadgeTextStyle}"/>
                     </Border>
                 </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Margin="0,0,26,0">
+                        <TextBlock Text="当前规则" FontSize="10" Foreground="#8290A5" FontFamily="Microsoft YaHei UI"/>
+                        <TextBlock Text="{Binding CurrentRule.RuleName}" FontSize="13" Foreground="White" FontWeight="SemiBold" FontFamily="Microsoft YaHei UI" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,26,0">
+                        <TextBlock Text="待处理文件" FontSize="10" Foreground="#8290A5" FontFamily="Microsoft YaHei UI"/>
+                        <TextBlock Text="{Binding FileItems.Count}" FontSize="13" Foreground="White" FontWeight="SemiBold" FontFamily="Segoe UI" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <Border Background="#243149" CornerRadius="7" Padding="12,8">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="7" Height="7" Fill="#2DD4BF" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                            <TextBlock Text="工作台就绪" FontSize="11" Foreground="#D8E2EF" FontFamily="Microsoft YaHei UI"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
         <!-- ========== MAIN: LEFT RULES + RIGHT FILES ========== -->
         <Grid Grid.Row="1" Margin="20,16,20,8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="295"/>
+                <ColumnDefinition Width="176"/>
+                <ColumnDefinition Width="520"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
+            <!-- WORKFLOW NAVIGATION -->
+            <Border Grid.Column="0" Background="#172033" CornerRadius="12" Margin="0,0,14,0" Padding="14,16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="工作流" FontSize="11" Foreground="#7F8DA3" FontWeight="SemiBold" FontFamily="Microsoft YaHei UI"/>
+                        <TextBlock Text="排版控制台" FontSize="16" Foreground="White" FontWeight="SemiBold" FontFamily="Microsoft YaHei UI" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Margin="0,24,0,0">
+                        <Border Background="#2A3953" CornerRadius="7" Padding="10,11" Margin="0,0,0,6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="01" FontSize="10" Foreground="#2DD4BF" FontWeight="Bold" FontFamily="Segoe UI" Width="28"/>
+                                <TextBlock Text="排版规则" FontSize="12" Foreground="White" FontWeight="SemiBold" FontFamily="Microsoft YaHei UI"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="10,11" Margin="0,0,0,6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="02" FontSize="10" Foreground="#71819A" FontWeight="Bold" FontFamily="Segoe UI" Width="28"/>
+                                <TextBlock Text="文件队列" FontSize="12" Foreground="#B4C0D1" FontFamily="Microsoft YaHei UI"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="10,11" Margin="0,0,0,6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="03" FontSize="10" Foreground="#71819A" FontWeight="Bold" FontFamily="Segoe UI" Width="28"/>
+                                <TextBlock Text="处理结果" FontSize="12" Foreground="#B4C0D1" FontFamily="Microsoft YaHei UI"/>
+                            </StackPanel>
+                        </Border>
+                        <Separator Background="#34445E" Margin="10,10,10,12"/>
+                        <TextBlock Text="页面设置" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
+                        <TextBlock Text="字体与段落" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
+                        <TextBlock Text="标题与编号" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
+                        <TextBlock Text="表格与扩展" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
+                    </StackPanel>
+                    <Border Grid.Row="2" Background="#223049" CornerRadius="8" Padding="10,11">
+                        <StackPanel>
+                            <TextBlock Text="处理提示" FontSize="10" Foreground="#7F8DA3" FontFamily="Microsoft YaHei UI"/>
+                            <TextBlock Text="拖入 Word 文件后开始配置" FontSize="11" Foreground="#D7E0ED" TextWrapping="Wrap" FontFamily="Microsoft YaHei UI" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
             <!-- LEFT: RULES PANEL -->
-            <Border Grid.Column="0" Background="White" CornerRadius="14" Margin="0,0,12,0" Padding="16,14">
+            <Border Grid.Column="1" Background="White" CornerRadius="12" Margin="0,0,16,0" Padding="22,18">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Color="#1A1A2E" Opacity="0.05"/>
                 </Border.Effect>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
                         <!-- PANEL TITLE -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="#F1F5F9" CornerRadius="8" Padding="14,12" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="排版规则" FontSize="18" FontWeight="SemiBold" Foreground="#172033" FontFamily="Microsoft YaHei UI"/>
+                                    <TextBlock Text="页面、正文、标题、表格与扩展处理" FontSize="11" Foreground="#7C8798" FontFamily="Microsoft YaHei UI" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <Border Grid.Column="1" Background="#2DD4BF" CornerRadius="6" Padding="9,6" VerticalAlignment="Center">
+                                    <TextBlock Text="规则" FontSize="10" FontWeight="SemiBold" Foreground="#102027" FontFamily="Microsoft YaHei UI"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12" Visibility="Collapsed">
                             <TextBlock Text="📐" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
                             <TextBlock Text="排版规则" FontSize="15" FontWeight="SemiBold" Foreground="#1A1A2E" FontFamily="Microsoft YaHei UI" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -83,6 +158,8 @@
                         <Border Style="{StaticResource RuleGroupCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="页面设置" Style="{StaticResource RuleGroupTitleStyle}"/>
+                                <CheckBox Content="应用页面设置" IsChecked="{Binding CurrentRule.ApplyPageMargins}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <StackPanel IsEnabled="{Binding CurrentRule.ApplyPageMargins}">
                                 <UniformGrid Columns="2" Margin="0,0,0,0">
                                     <StackPanel Margin="0,0,4,4">
                                         <TextBlock Text="上边距 (cm)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
@@ -101,6 +178,7 @@
                                         <TextBox Text="{Binding CurrentRule.PageMargins.RightMargin, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
                                     </StackPanel>
                                 </UniformGrid>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -108,11 +186,13 @@
                         <Border Style="{StaticResource RuleGroupCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="正文格式" Style="{StaticResource RuleGroupTitleStyle}"/>
+                                <CheckBox Content="应用正文格式" IsChecked="{Binding CurrentRule.ApplyBodyFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <StackPanel IsEnabled="{Binding CurrentRule.ApplyBodyFormatting}">
                                 <TextBlock Text="中文字体" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                 <ComboBox ItemsSource="{Binding ChineseFontNames}" SelectedItem="{Binding CurrentRule.BodyText.ChineseFontName}" Style="{StaticResource RuleComboBoxStyle}" IsEditable="True" Margin="0,0,0,6"/>
                                 <TextBlock Text="英文字体" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                 <ComboBox ItemsSource="{Binding EnglishFontNames}" SelectedItem="{Binding CurrentRule.BodyText.EnglishFontName}" Style="{StaticResource RuleComboBoxStyle}" IsEditable="True" Margin="0,0,0,6"/>
-                                <UniformGrid Columns="2">
+                                <UniformGrid Columns="3">
                                     <StackPanel Margin="0,0,4,0">
                                         <TextBlock Text="字号" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                         <ComboBox ItemsSource="{Binding FontSizeNames}" SelectedItem="{Binding CurrentRule.BodyText.FontSizeName}" Style="{StaticResource RuleComboBoxStyle}" SelectionChanged="BodyFontSize_Changed"/>
@@ -127,8 +207,10 @@
                                     <CheckBox Content="设置字体颜色" IsChecked="{Binding CurrentRule.BodyText.UseCustomFontColor}" Style="{StaticResource RuleCheckBoxStyle}" VerticalAlignment="Center"/>
                                     <TextBox Text="{Binding CurrentRule.BodyText.FontColorHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="80" Margin="8,0,0,0" IsEnabled="{Binding CurrentRule.BodyText.UseCustomFontColor}" VerticalAlignment="Center"/>
                                 </StackPanel>
+                                </StackPanel>
                                 <Separator Background="#E5E7EB" Margin="0,8,0,6"/>
                                 <CheckBox Content="规范化文本（去除中英文空格、英文标点转中文）" IsChecked="{Binding CurrentRule.NormalizeBodyText}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <CheckBox Content="清除文字高亮和底纹背景色" IsChecked="{Binding CurrentRule.ClearTextBackground}" Style="{StaticResource RuleCheckBoxStyle}" Margin="0,5,0,0"/>
                             </StackPanel>
                         </Border>
 
@@ -136,28 +218,37 @@
                         <Border Style="{StaticResource RuleGroupCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="段落格式" Style="{StaticResource RuleGroupTitleStyle}"/>
+                                <CheckBox Content="应用正文格式" IsChecked="{Binding CurrentRule.ApplyBodyFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <StackPanel IsEnabled="{Binding CurrentRule.ApplyBodyFormatting}">
                                 <TextBlock Text="首行缩进 (字符)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                 <TextBox Text="{Binding CurrentRule.Paragraph.FirstLineIndentChars, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Margin="0,0,0,6"/>
-                                <UniformGrid Columns="2">
+                                <UniformGrid Columns="3">
                                     <StackPanel Margin="0,0,4,6">
                                         <TextBlock Text="行距类型" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                         <ComboBox ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" SelectedIndex="1" SelectionChanged="BodyLineSpacingType_Changed"/>
                                     </StackPanel>
                                     <StackPanel Margin="4,0,0,6">
                                         <TextBlock Text="行距值" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
-                                        <TextBox Text="{Binding CurrentRule.Paragraph.LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
+                                        <TextBox Text="{Binding CurrentRule.Paragraph.LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Visibility="{Binding CurrentRule.Paragraph.HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="4,0,0,6">
+                                        <TextBlock Text="单位" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                        <TextBlock Text="{Binding CurrentRule.Paragraph.LineSpacingValueUnitText}" VerticalAlignment="Center" Foreground="#6B7280" Visibility="{Binding CurrentRule.Paragraph.HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
                                     </StackPanel>
                                 </UniformGrid>
+                                <TextBlock Text="正文对齐方式" FontSize="10.5" Foreground="#9CA3AF" Margin="0,6,0,3"/>
+                                <ComboBox ItemsSource="{Binding AlignmentTypes}" SelectedIndex="{Binding CurrentRule.Paragraph.AlignmentIndex}" Style="{StaticResource RuleComboBoxStyle}"/>
                                 <UniformGrid Columns="2">
                                     <StackPanel Margin="0,0,4,0">
                                         <TextBlock Text="段前 (行)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
-                                        <TextBox Text="{Binding CurrentRule.Paragraph.SpaceBeforeLines, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
+                                        <StackPanel Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Paragraph.SpaceBeforeLines, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="70"/><TextBlock Text="行" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="#6B7280"/></StackPanel>
                                     </StackPanel>
                                     <StackPanel Margin="4,0,0,0">
                                         <TextBlock Text="段后 (行)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
-                                        <TextBox Text="{Binding CurrentRule.Paragraph.SpaceAfterLines, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
+                                        <StackPanel Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Paragraph.SpaceAfterLines, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="70"/><TextBlock Text="行" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="#6B7280"/></StackPanel>
                                     </StackPanel>
                                 </UniformGrid>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -165,6 +256,8 @@
                         <Border Style="{StaticResource RuleGroupCardStyle}">
                             <StackPanel>
                                 <TextBlock Text="标题格式" Style="{StaticResource RuleGroupTitleStyle}"/>
+                                <CheckBox Content="应用标题样式" IsChecked="{Binding CurrentRule.ApplyHeadingFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
+                                <StackPanel IsEnabled="{Binding CurrentRule.ApplyHeadingFormatting}">
                                 <!-- 列标题 -->
                                 <Grid Margin="0,4,0,4">
                                     <Grid.ColumnDefinitions>
@@ -234,12 +327,14 @@
                                         <ColumnDefinition Width="48"/>
                                         <ColumnDefinition Width="48"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="46"/>
+                                    <ColumnDefinition Width="46"/>
+                                    <ColumnDefinition Width="58"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="1" Text="段前pt" FontSize="9.5" Foreground="#9CA3AF"/>
                                     <TextBlock Grid.Column="2" Text="段后pt" FontSize="9.5" Foreground="#9CA3AF"/>
                                     <TextBlock Grid.Column="3" Text="行距" FontSize="9.5" Foreground="#9CA3AF" Margin="4,0,0,0"/>
                                     <TextBlock Grid.Column="4" Text="值" FontSize="9.5" Foreground="#9CA3AF" Margin="4,0,0,0"/>
+                                    <TextBlock Grid.Column="5" Text="单位" FontSize="9.5" Foreground="#9CA3AF" Margin="4,0,0,0"/>
                                 </Grid>
                                 <Grid Margin="0,0,0,4">
                                     <Grid.ColumnDefinitions>
@@ -250,10 +345,11 @@
                                         <ColumnDefinition Width="46"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="标题 1" FontSize="11" Foreground="#374151" VerticalAlignment="Center"/>
-                                    <TextBox Grid.Column="1" Text="{Binding CurrentRule.Headings[0].SpaceBeforePoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
-                                    <TextBox Grid.Column="2" Text="{Binding CurrentRule.Headings[0].SpaceAfterPoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Headings[0].SpaceBeforePointsText, UpdateSourceTrigger=LostFocus}" Style="{StaticResource RuleTextBoxStyle}" Height="26" Width="38" FontSize="11"/><TextBlock Text="pt" VerticalAlignment="Center" Margin="3,0,0,0" Foreground="#6B7280"/></StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Headings[0].SpaceAfterPointsText, UpdateSourceTrigger=LostFocus}" Style="{StaticResource RuleTextBoxStyle}" Height="26" Width="38" FontSize="11"/><TextBlock Text="pt" VerticalAlignment="Center" Margin="3,0,0,0" Foreground="#6B7280"/></StackPanel>
                                     <ComboBox Grid.Column="3" ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11" SelectedIndex="1" Tag="1" SelectionChanged="HeadingLineSpacingType_Changed" Margin="0,0,4,0"/>
-                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[0].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
+                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[0].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Visibility="{Binding CurrentRule.Headings[0].HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Grid.Column="5" Text="{Binding CurrentRule.Headings[0].LineSpacingValueUnitText}" VerticalAlignment="Center" Margin="4,0,0,0" Foreground="#6B7280" Visibility="{Binding CurrentRule.Headings[0].HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
                                 </Grid>
                                 <Grid Margin="0,0,0,4">
                                     <Grid.ColumnDefinitions>
@@ -264,10 +360,11 @@
                                         <ColumnDefinition Width="46"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="标题 2" FontSize="11" Foreground="#374151" VerticalAlignment="Center"/>
-                                    <TextBox Grid.Column="1" Text="{Binding CurrentRule.Headings[1].SpaceBeforePoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
-                                    <TextBox Grid.Column="2" Text="{Binding CurrentRule.Headings[1].SpaceAfterPoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Headings[1].SpaceBeforePointsText, UpdateSourceTrigger=LostFocus}" Style="{StaticResource RuleTextBoxStyle}" Height="26" Width="38" FontSize="11"/><TextBlock Text="pt" VerticalAlignment="Center" Margin="3,0,0,0" Foreground="#6B7280"/></StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Headings[1].SpaceAfterPointsText, UpdateSourceTrigger=LostFocus}" Style="{StaticResource RuleTextBoxStyle}" Height="26" Width="38" FontSize="11"/><TextBlock Text="pt" VerticalAlignment="Center" Margin="3,0,0,0" Foreground="#6B7280"/></StackPanel>
                                     <ComboBox Grid.Column="3" ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11" SelectedIndex="1" Tag="2" SelectionChanged="HeadingLineSpacingType_Changed" Margin="0,0,4,0"/>
-                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[1].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
+                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[1].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Visibility="{Binding CurrentRule.Headings[1].HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Grid.Column="5" Text="{Binding CurrentRule.Headings[1].LineSpacingValueUnitText}" VerticalAlignment="Center" Margin="4,0,0,0" Foreground="#6B7280" Visibility="{Binding CurrentRule.Headings[1].HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
                                 </Grid>
                                 <Grid Margin="0,0,0,4">
                                     <Grid.ColumnDefinitions>
@@ -278,12 +375,28 @@
                                         <ColumnDefinition Width="46"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="标题 3" FontSize="11" Foreground="#374151" VerticalAlignment="Center"/>
-                                    <TextBox Grid.Column="1" Text="{Binding CurrentRule.Headings[2].SpaceBeforePoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
-                                    <TextBox Grid.Column="2" Text="{Binding CurrentRule.Headings[2].SpaceAfterPoints, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Margin="0,0,4,0"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Headings[2].SpaceBeforePointsText, UpdateSourceTrigger=LostFocus}" Style="{StaticResource RuleTextBoxStyle}" Height="26" Width="38" FontSize="11"/><TextBlock Text="pt" VerticalAlignment="Center" Margin="3,0,0,0" Foreground="#6B7280"/></StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal"><TextBox Text="{Binding CurrentRule.Headings[2].SpaceAfterPointsText, UpdateSourceTrigger=LostFocus}" Style="{StaticResource RuleTextBoxStyle}" Height="26" Width="38" FontSize="11"/><TextBlock Text="pt" VerticalAlignment="Center" Margin="3,0,0,0" Foreground="#6B7280"/></StackPanel>
                                     <ComboBox Grid.Column="3" ItemsSource="{Binding LineSpacingTypes}" Style="{StaticResource RuleComboBoxStyle}" Height="26" FontSize="11" SelectedIndex="1" Tag="3" SelectionChanged="HeadingLineSpacingType_Changed" Margin="0,0,4,0"/>
-                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[2].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11"/>
+                                    <TextBox Grid.Column="4" Text="{Binding CurrentRule.Headings[2].LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Height="26" FontSize="11" Visibility="{Binding CurrentRule.Headings[2].HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Grid.Column="5" Text="{Binding CurrentRule.Headings[2].LineSpacingValueUnitText}" VerticalAlignment="Center" Margin="4,0,0,0" Foreground="#6B7280" Visibility="{Binding CurrentRule.Headings[2].HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
                                 </Grid>
                                 <TextBlock Text="英文标题字体固定 Times New Roman" FontSize="9.5" Foreground="#9CA3AF" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                <UniformGrid Columns="2" Margin="0,2,0,0">
+                                    <StackPanel Margin="0,0,4,4">
+                                        <TextBlock Text="标题1对齐" FontSize="10" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                        <ComboBox ItemsSource="{Binding AlignmentTypes}" SelectedIndex="{Binding CurrentRule.Headings[0].AlignmentIndex}" Style="{StaticResource RuleComboBoxStyle}" Tag="1" SelectionChanged="HeadingAlignment_Changed"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="4,0,0,4">
+                                        <TextBlock Text="标题2对齐" FontSize="10" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                        <ComboBox ItemsSource="{Binding AlignmentTypes}" SelectedIndex="{Binding CurrentRule.Headings[1].AlignmentIndex}" Style="{StaticResource RuleComboBoxStyle}" Tag="2" SelectionChanged="HeadingAlignment_Changed"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <StackPanel Margin="0,0,0,4">
+                                    <TextBlock Text="标题3对齐" FontSize="10" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                    <ComboBox ItemsSource="{Binding AlignmentTypes}" SelectedIndex="{Binding CurrentRule.Headings[2].AlignmentIndex}" Style="{StaticResource RuleComboBoxStyle}" Tag="3" SelectionChanged="HeadingAlignment_Changed"/>
+                                </StackPanel>
+                                </StackPanel>
                                 <!-- 标题自动编号 -->
                                 <Separator Background="#E5E7EB" Margin="0,8,0,6"/>
                                 <CheckBox Content="启用标题自动编号" IsChecked="{Binding CurrentRule.HeadingNumbering.EnableNumbering}" Style="{StaticResource RuleCheckBoxStyle}"/>
@@ -292,7 +405,7 @@
                                     <TextBlock Text="编号方案" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                     <ComboBox ItemsSource="{Binding HeadingNumberingSchemes}"
                                               Style="{StaticResource RuleComboBoxStyle}"
-                                              SelectedIndex="0"
+                                              SelectedIndex="{Binding CurrentRule.HeadingNumbering.SchemeIndex}"
                                               SelectionChanged="HeadingNumberingScheme_Changed"/>
                                 </StackPanel>
                             </StackPanel>
@@ -308,7 +421,7 @@
                                     <!-- 字体字号 -->
                                     <TextBlock Text="中文字体" FontSize="10.5" Foreground="#9CA3AF" Margin="0,6,0,3"/>
                                     <ComboBox ItemsSource="{Binding ChineseFontNames}" SelectedItem="{Binding CurrentRule.Table.ChineseFontName}" Style="{StaticResource RuleComboBoxStyle}" IsEditable="True"/>
-                                    <UniformGrid Columns="2" Margin="0,4,0,0">
+                                    <UniformGrid Columns="3" Margin="0,4,0,0">
                                         <StackPanel Margin="0,0,4,0">
                                             <TextBlock Text="字号" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                             <ComboBox ItemsSource="{Binding FontSizeNames}" SelectedItem="{Binding CurrentRule.Table.FontSizeName}" Style="{StaticResource RuleComboBoxStyle}" SelectionChanged="TableFontSize_Changed"/>
@@ -329,7 +442,11 @@
                                     <UniformGrid Columns="2" Margin="0,4,0,0">
                                         <StackPanel Margin="0,0,4,0">
                                             <TextBlock Text="行距值 (磅)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
-                                            <TextBox Text="{Binding CurrentRule.Table.LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}"/>
+                                            <TextBox Text="{Binding CurrentRule.Table.LineSpacingValue, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Visibility="{Binding CurrentRule.Table.HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                        <StackPanel Margin="4,0,0,0">
+                                            <TextBlock Text="单位" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
+                                        <TextBlock Text="{Binding CurrentRule.Table.LineSpacingValueUnitText}" VerticalAlignment="Center" Foreground="#6B7280" Visibility="{Binding CurrentRule.Table.HasLineSpacingValue, Converter={StaticResource BoolToVis}}"/>
                                         </StackPanel>
                                         <StackPanel Margin="4,0,0,0">
                                             <TextBlock Text="边框" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
@@ -381,7 +498,7 @@
             </Border>
 
             <!-- RIGHT: FILES AREA -->
-            <Grid Grid.Column="1">
+            <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>

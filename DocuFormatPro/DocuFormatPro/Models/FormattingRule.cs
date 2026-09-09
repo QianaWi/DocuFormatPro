@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
@@ -18,6 +19,10 @@ namespace DocuFormatPro.Models
         private FrontMatterSettings _frontMatter = new();
         private HeadingNumberingSettings _headingNumbering = new();
         private bool _normalizeBodyText = true;
+        private bool _clearTextBackground = true;
+        private bool _applyPageMargins = true;
+        private bool _applyBodyFormatting = true;
+        private bool _applyHeadingFormatting = true;
 
         /// <summary>规则/模板名称</summary>
         public string RuleName
@@ -82,6 +87,33 @@ namespace DocuFormatPro.Models
             set { _normalizeBodyText = value; OnPropertyChanged(); }
         }
 
+        public bool ClearTextBackground
+        {
+            get => _clearTextBackground;
+            set { _clearTextBackground = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>是否应用页面边距</summary>
+        public bool ApplyPageMargins
+        {
+            get => _applyPageMargins;
+            set { _applyPageMargins = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>是否应用正文格式（字体+段落）</summary>
+        public bool ApplyBodyFormatting
+        {
+            get => _applyBodyFormatting;
+            set { _applyBodyFormatting = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>是否应用标题样式（不含自动编号）</summary>
+        public bool ApplyHeadingFormatting
+        {
+            get => _applyHeadingFormatting;
+            set { _applyHeadingFormatting = value; OnPropertyChanged(); }
+        }
+
         /// <summary>
         /// 返回包含用户指定默认值的排版规则
         /// </summary>
@@ -108,6 +140,7 @@ namespace DocuFormatPro.Models
                 Paragraph = new ParagraphSettings
                 {
                     FirstLineIndentChars = 2f,
+                    Alignment = TextAlignment.Justify,
                     LineSpacingType = LineSpacingType.OneAndHalf,
                     LineSpacingValue = 1.5f,
                     SpaceBeforeLines = 0f,
@@ -235,14 +268,30 @@ namespace DocuFormatPro.Models
     public class ParagraphSettings : INotifyPropertyChanged
     {
         private float _firstLineIndentChars = 2f;
+        private TextAlignment _alignment = TextAlignment.Justify;
         private LineSpacingType _lineSpacingType = LineSpacingType.OneAndHalf;
         private float _lineSpacingValue = 1.5f;
+        private LineSpacingUnit _lineSpacingUnit = LineSpacingUnit.Lines;
         private float _spaceBeforeLines;
         private float _spaceAfterLines;
 
         public float FirstLineIndentChars { get => _firstLineIndentChars; set { _firstLineIndentChars = value; OnPropertyChanged(); } }
-        public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); } }
+        public TextAlignment Alignment { get => _alignment; set { _alignment = value; OnPropertyChanged(); } }
+        [JsonIgnore]
+        public int AlignmentIndex
+        {
+            get => (int)Alignment;
+            set
+            {
+                if (value >= 0 && value <= (int)TextAlignment.Justify)
+                    Alignment = (TextAlignment)value;
+            }
+        }
+        public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); OnPropertyChanged(nameof(LineSpacingValueUnitText)); OnPropertyChanged(nameof(HasLineSpacingValue)); } }
         public float LineSpacingValue { get => _lineSpacingValue; set { _lineSpacingValue = value; OnPropertyChanged(); } }
+        public LineSpacingUnit LineSpacingUnit { get => _lineSpacingUnit; set { _lineSpacingUnit = value; OnPropertyChanged(); } }
+        [JsonIgnore] public string LineSpacingValueUnitText => _lineSpacingType == LineSpacingType.Multiple ? "行" : "磅（pt）";
+        [JsonIgnore] public bool HasLineSpacingValue => _lineSpacingType == LineSpacingType.Multiple || _lineSpacingType == LineSpacingType.Fixed || _lineSpacingType == LineSpacingType.AtLeast;
         public float SpaceBeforeLines { get => _spaceBeforeLines; set { _spaceBeforeLines = value; OnPropertyChanged(); } }
         public float SpaceAfterLines { get => _spaceAfterLines; set { _spaceAfterLines = value; OnPropertyChanged(); } }
 
@@ -265,6 +314,7 @@ namespace DocuFormatPro.Models
         private float _spaceAfterLines;
         private LineSpacingType _lineSpacingType = LineSpacingType.Single;
         private float _lineSpacingValue = 1f;
+        private LineSpacingUnit _lineSpacingUnit = LineSpacingUnit.Lines;
         private TableBorderStyle _borderStyle = TableBorderStyle.SingleThin;
         private string _borderColorHex = "#000000";
         private CellVerticalAlign _cellVerticalAlignment = CellVerticalAlign.Center;
@@ -289,8 +339,11 @@ namespace DocuFormatPro.Models
         public string FontSizeName { get => _fontSizeName; set { _fontSizeName = value; OnPropertyChanged(); } }
         public float SpaceBeforeLines { get => _spaceBeforeLines; set { _spaceBeforeLines = value; OnPropertyChanged(); } }
         public float SpaceAfterLines { get => _spaceAfterLines; set { _spaceAfterLines = value; OnPropertyChanged(); } }
-        public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); } }
+        public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); OnPropertyChanged(nameof(LineSpacingValueUnitText)); OnPropertyChanged(nameof(HasLineSpacingValue)); } }
         public float LineSpacingValue { get => _lineSpacingValue; set { _lineSpacingValue = value; OnPropertyChanged(); } }
+        public LineSpacingUnit LineSpacingUnit { get => _lineSpacingUnit; set { _lineSpacingUnit = value; OnPropertyChanged(); } }
+        [JsonIgnore] public string LineSpacingValueUnitText => _lineSpacingType == LineSpacingType.Multiple ? "行" : "磅（pt）";
+        [JsonIgnore] public bool HasLineSpacingValue => _lineSpacingType == LineSpacingType.Multiple || _lineSpacingType == LineSpacingType.Fixed || _lineSpacingType == LineSpacingType.AtLeast;
         public TableBorderStyle BorderStyle { get => _borderStyle; set { _borderStyle = value; OnPropertyChanged(); } }
         public string BorderColorHex { get => _borderColorHex; set { _borderColorHex = value; OnPropertyChanged(); } }
         public CellVerticalAlign CellVerticalAlignment { get => _cellVerticalAlignment; set { _cellVerticalAlignment = value; OnPropertyChanged(); } }
@@ -323,6 +376,7 @@ namespace DocuFormatPro.Models
         private float _spaceAfterPoints = 6f;
         private LineSpacingType _lineSpacingType = LineSpacingType.OneAndHalf;
         private float _lineSpacingValue = 1.5f;
+        private LineSpacingUnit _lineSpacingUnit = LineSpacingUnit.Lines;
         private bool _useCustomFontColor = true;
         private string _fontColorHex = "#000000";
 
@@ -333,12 +387,51 @@ namespace DocuFormatPro.Models
         public string FontSizeName { get => _fontSizeName; set { _fontSizeName = value; OnPropertyChanged(); } }
         public bool IsBold { get => _isBold; set { _isBold = value; OnPropertyChanged(); } }
         public TextAlignment Alignment { get => _alignment; set { _alignment = value; OnPropertyChanged(); } }
+        [JsonIgnore]
+        public int AlignmentIndex
+        {
+            get => (int)Alignment;
+            set
+            {
+                if (value >= 0 && value <= (int)TextAlignment.Justify)
+                    Alignment = (TextAlignment)value;
+            }
+        }
         public float SpaceBeforeLines { get => _spaceBeforeLines; set { _spaceBeforeLines = value; OnPropertyChanged(); } }
         public float SpaceAfterLines { get => _spaceAfterLines; set { _spaceAfterLines = value; OnPropertyChanged(); } }
         public float SpaceBeforePoints { get => _spaceBeforePoints; set { _spaceBeforePoints = value; OnPropertyChanged(); } }
         public float SpaceAfterPoints { get => _spaceAfterPoints; set { _spaceAfterPoints = value; OnPropertyChanged(); } }
-        public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); } }
+        [JsonIgnore]
+        public string SpaceBeforePointsText
+        {
+            get => _spaceBeforePoints.ToString("0.##", CultureInfo.CurrentCulture);
+            set
+            {
+                if (TryParsePoint(value, out float points))
+                {
+                    _spaceBeforePoints = points;
+                    OnPropertyChanged(nameof(SpaceBeforePoints));
+                }
+            }
+        }
+        [JsonIgnore]
+        public string SpaceAfterPointsText
+        {
+            get => _spaceAfterPoints.ToString("0.##", CultureInfo.CurrentCulture);
+            set
+            {
+                if (TryParsePoint(value, out float points))
+                {
+                    _spaceAfterPoints = points;
+                    OnPropertyChanged(nameof(SpaceAfterPoints));
+                }
+            }
+        }
+        public LineSpacingType LineSpacingType { get => _lineSpacingType; set { _lineSpacingType = value; OnPropertyChanged(); OnPropertyChanged(nameof(LineSpacingValueUnitText)); OnPropertyChanged(nameof(HasLineSpacingValue)); } }
         public float LineSpacingValue { get => _lineSpacingValue; set { _lineSpacingValue = value; OnPropertyChanged(); } }
+        public LineSpacingUnit LineSpacingUnit { get => _lineSpacingUnit; set { _lineSpacingUnit = value; OnPropertyChanged(); } }
+        [JsonIgnore] public string LineSpacingValueUnitText => _lineSpacingType == LineSpacingType.Multiple ? "行" : "磅（pt）";
+        [JsonIgnore] public bool HasLineSpacingValue => _lineSpacingType == LineSpacingType.Multiple || _lineSpacingType == LineSpacingType.Fixed || _lineSpacingType == LineSpacingType.AtLeast;
         /// <summary>是否启用自定义字体颜色</summary>
         public bool UseCustomFontColor { get => _useCustomFontColor; set { _useCustomFontColor = value; OnPropertyChanged(); } }
         /// <summary>字体颜色（十六进制，如 #000000）</summary>
@@ -351,6 +444,10 @@ namespace DocuFormatPro.Models
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private static bool TryParsePoint(string? text, out float value)
+            => float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value)
+               || float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
     }
 
     #endregion
@@ -399,6 +496,17 @@ namespace DocuFormatPro.Models
             set { _scheme = value; OnPropertyChanged(); }
         }
 
+        [JsonIgnore]
+        public int SchemeIndex
+        {
+            get => (int)Scheme;
+            set
+            {
+                if (value >= 0 && value <= (int)HeadingNumberingScheme.NumericWithPeriod)
+                    Scheme = (HeadingNumberingScheme)value;
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -416,6 +524,12 @@ namespace DocuFormatPro.Models
         Multiple,   // 多倍行距
         Fixed,      // 固定值 (磅)
         AtLeast     // 最小值 (磅)
+    }
+
+    public enum LineSpacingUnit
+    {
+        Lines,
+        Points
     }
 
     public enum TextAlignment
@@ -452,7 +566,8 @@ namespace DocuFormatPro.Models
     {
         Numeric,        // 1 / 1.1 / 1.1.1
         ChapterNumeric, // 第一章 / 1.1 / 1.1.1
-        Traditional     // 一、/ （一）/ 1.
+        Traditional,     // 一、/ （一）/ 1.
+        NumericWithPeriod // 1. / 1.1. / 1.1.1.
     }
 
     #endregion

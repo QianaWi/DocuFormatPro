@@ -36,6 +36,9 @@ namespace DocuFormatPro.Services
                     Document? doc = null;
                     try
                     {
+                        // 注册 COM 消息过滤器：Word 忙导致 RPC_E_CALL_REJECTED 时自动等待重试
+                        ComCallRetryFilter.Register();
+
                         var stepTimer = Stopwatch.StartNew();
                         void ReportStepDone(string stepName)
                         {
@@ -79,22 +82,31 @@ namespace DocuFormatPro.Services
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 1. 设置页边距 =====
-                        progress?.Report("正在标准化页边距...");
-                        SetPageMargins(wordApp, doc, rule);
-                        ReportStepDone("页边距");
-                        cancellationToken.ThrowIfCancellationRequested();
+                        if (rule.ApplyPageMargins)
+                        {
+                            progress?.Report("正在标准化页边距...");
+                            SetPageMargins(wordApp, doc, rule);
+                            ReportStepDone("页边距");
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
 
                         // ===== 2. 设置正文样式 =====
-                        progress?.Report("正在设置正文格式...");
-                        ApplyBodyTextStyle(doc, rule);
-                        ReportStepDone("正文样式");
-                        cancellationToken.ThrowIfCancellationRequested();
+                        if (rule.ApplyBodyFormatting)
+                        {
+                            progress?.Report("正在设置正文格式...");
+                            ApplyBodyTextStyle(doc, rule);
+                            ReportStepDone("正文样式");
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
 
                         // ===== 3. 设置标题样式 =====
-                        progress?.Report("正在设置标题格式...");
-                        ApplyHeadingStyles(doc, rule, resetDirectFormatting: !isDocxDocument);
-                        ReportStepDone("标题样式");
-                        cancellationToken.ThrowIfCancellationRequested();
+                        if (rule.ApplyHeadingFormatting)
+                        {
+                            progress?.Report("正在设置标题格式...");
+                            ApplyHeadingStyles(doc, rule, resetDirectFormatting: !isDocxDocument);
+                            ReportStepDone("标题样式");
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
 
                         // ===== 3b. 标题自动编号 =====
                         if (rule.HeadingNumbering.EnableNumbering)
@@ -108,7 +120,7 @@ namespace DocuFormatPro.Services
                         // ===== 4. 逐段落应用格式 =====
                         progress?.Report("正在处理段落格式...");
                         // ===== 5. 格式化表格 =====
-                        if (!isDocxDocument)
+                        if (!isDocxDocument && rule.ApplyBodyFormatting)
                         {
                             ApplyParagraphFormatting(doc, rule);
                             ReportStepDone("段落格式");
@@ -128,8 +140,10 @@ namespace DocuFormatPro.Services
                         // 如果启用了首行底色，跳过首行单元格，避免清除后再设置的竞争问题
                         bool skipFirstRow = rule.Table.ApplyTableFormatting && rule.Table.UseHeaderShading;
                         if (!isDocxDocument)
-                            ClearAllTextBackground(doc, skipFirstRow);
-                        ReportStepDone("背景清理");
+                            if (rule.ClearTextBackground)
+                                ClearAllTextBackground(doc, skipFirstRow);
+                        if (rule.ClearTextBackground)
+                            ReportStepDone("背景清理");
                         cancellationToken.ThrowIfCancellationRequested();
 
                         // ===== 6b. 重新应用首行底色（在清除背景后执行，避免被覆盖）=====
@@ -232,6 +246,8 @@ namespace DocuFormatPro.Services
                                 wordApp = null;
                             }
                         }
+
+                        ComCallRetryFilter.Revoke();
                     }
                 });
 
@@ -282,9 +298,16 @@ namespace DocuFormatPro.Services
 
                 // 段落格式
                 var pf = normalStyle.ParagraphFormat;
+                pf.Alignment = rule.Paragraph.Alignment switch
+                {
+                    TextAlignment.Center => WdParagraphAlignment.wdAlignParagraphCenter,
+                    TextAlignment.Right => WdParagraphAlignment.wdAlignParagraphRight,
+                    TextAlignment.Justify => WdParagraphAlignment.wdAlignParagraphJustify,
+                    _ => WdParagraphAlignment.wdAlignParagraphLeft
+                };
                 pf.CharacterUnitFirstLineIndent = rule.Paragraph.FirstLineIndentChars;
                 pf.FirstLineIndent = 0; // 让 CharacterUnit 控制
-                ApplyLineSpacing(pf, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue);
+                ApplyLineSpacing(pf, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue, rule.Paragraph.LineSpacingUnit);
                 pf.SpaceBeforeAuto = 0;
                 pf.SpaceAfterAuto = 0;
                 pf.SpaceBefore = rule.Paragraph.SpaceBeforeLines * 12f;
@@ -343,7 +366,7 @@ namespace DocuFormatPro.Services
                     };
 
                     // 行距
-                    ApplyLineSpacing(style.ParagraphFormat, heading.LineSpacingType, heading.LineSpacingValue);
+                    ApplyLineSpacing(style.ParagraphFormat, heading.LineSpacingType, heading.LineSpacingValue, heading.LineSpacingUnit);
 
                     // 段前段后（按标题配置的磅值）
                     style.ParagraphFormat.SpaceBeforeAuto = 0;
@@ -409,6 +432,25 @@ namespace DocuFormatPro.Services
         private static string BuildNumberFormat(int level)
             => string.Join(".", Enumerable.Range(1, Math.Clamp(level, 1, 9)).Select(i => $"%{i}"));
 
+        /// <summary>
+        /// 从标题文字开头的编号推断层级：数字链（9.1.1.1.4.1 → 6 级）、第X章 / 单段编号（→ 1 级）。
+        /// 无法推断返回 0（回退到样式号）。单段编号限 1~3 位数字，避免误判 "2023 年度报告"。
+        /// </summary>
+        private static int InferLevelFromHeadingText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return 0;
+            string t = text.TrimStart();
+
+            var chain = Regex.Match(t, @"^(\d+(?:\.\d+){1,8})");
+            if (chain.Success) return chain.Groups[1].Value.Split('.').Length;
+
+            if (Regex.IsMatch(t, @"^第[一二三四五六七八九十百\d]+[章节]")) return 1;
+
+            if (Regex.IsMatch(t, @"^\d{1,3}[\.、\s]")) return 1;
+
+            return 0;
+        }
+
         private static int GetHeadingLevelFromStyleName(string? styleName)
         {
             if (string.IsNullOrWhiteSpace(styleName)) return 0;
@@ -425,31 +467,42 @@ namespace DocuFormatPro.Services
                 "Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5", "Heading 6", "Heading 7", "Heading 8", "Heading 9"
             };
 
-            // 如果选择去除现有编号前缀，先剥离文字中的旧编号
-            if (settings.StripExistingNumbers)
+            // 一次遍历完成：收集标题段落 + 从文字编号推断层级 +（可选）剥离旧文字编号（推断之后写回）
+            // 文字中的数字编号是最可靠的层级信号：样式号可能与实际层级跳档
+            // （实测文档中 heading 9 的段落实为第 6 层，文字编号 9.1.1.1.4.1 共 6 段）
+            var headingParagraphs = new List<(Paragraph Para, int StyleLevel, int Level)>();
+            var stripPattern = settings.StripExistingNumbers
+                ? new Regex(
+                    @"^(\d+(\.\d+)*\.?\s*|第[一二三四五六七八九十百\d]+[章节条]\s*|[一二三四五六七八九十]+[、.]\s*|[（(][一二三四五六七八九十\d]+[)）]\s*|[①②③④⑤⑥⑦⑧⑨⑩]\s*|[a-zA-Z][).]\s+|[（(][a-zA-Z][)）]\s*|\d+[)）]\s*)",
+                    RegexOptions.None)
+                : null;
+
+            foreach (Paragraph para in doc.Paragraphs)
             {
-                var stripPattern = new Regex(
-                    @"^(\d+(\.\d+)*\.?\s*|第[一二三四五六七八九十百\d]+[章节条]\s*|[一二三四五六七八九十]+[、.]\s*|（[一二三四五六七八九十]+）\s*)",
-                    RegexOptions.None);
-
-                foreach (Paragraph para in doc.Paragraphs)
+                try
                 {
-                    try
-                    {
-                        var styleName = ((Style)para.get_Style()).NameLocal;
-                        if (!headingStyleNames.Contains(styleName)) continue;
+                    var styleName = ((Style)para.get_Style()).NameLocal;
+                    if (!headingStyleNames.Contains(styleName)) continue;
+                    int styleLevel = GetHeadingLevelFromStyleName(styleName);
+                    if (styleLevel == 0) continue;
 
-                        var r = para.Range;
-                        object unit = WdUnits.wdCharacter;
-                        object cnt = -1;
-                        r.MoveEnd(ref unit, ref cnt);
-                        string currentText = r.Text ?? "";
+                    var r = para.Range;
+                    object unit = WdUnits.wdCharacter;
+                    object cnt = -1;
+                    r.MoveEnd(ref unit, ref cnt);
+                    string currentText = r.Text ?? "";
+
+                    int inferred = InferLevelFromHeadingText(currentText);
+                    headingParagraphs.Add((para, styleLevel, inferred > 0 ? inferred : styleLevel));
+
+                    if (stripPattern != null)
+                    {
                         string stripped = stripPattern.Replace(currentText, "").TrimStart();
                         if (stripped != currentText)
                             r.Text = stripped;
                     }
-                    catch { continue; }
                 }
+                catch { }
             }
 
             try
@@ -490,27 +543,49 @@ namespace DocuFormatPro.Services
                             break;
 
                         case HeadingNumberingScheme.Traditional:
-                            if (level == 1)
+                            // 公文标准式，细化到第8级：一、（一）1.（1）1）① a.（a）
+                            switch (level)
                             {
-                                ll.NumberFormat = "%1、";
-                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
-                            }
-                            else if (level == 2)
-                            {
-                                ll.NumberFormat = "（%2）";
-                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
-                            }
-                            else if (level == 3)
-                            {
-                                ll.NumberFormat = "%3.";
-                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
-                            }
-                            else
-                            {
-                                ll.NumberFormat = BuildNumberFormat(level);
-                                ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                                case 1:
+                                    ll.NumberFormat = "%1、";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
+                                    break;
+                                case 2:
+                                    ll.NumberFormat = "（%2）";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleSimpChinNum2;
+                                    break;
+                                case 3:
+                                    ll.NumberFormat = "%3.";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                                    break;
+                                case 4:
+                                    ll.NumberFormat = "（%4）";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                                    break;
+                                case 5:
+                                    ll.NumberFormat = "%5）";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                                    break;
+                                case 6:
+                                    ll.NumberFormat = "%6";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleNumberInCircle;
+                                    break;
+                                case 7:
+                                    ll.NumberFormat = "%7.";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleLowercaseLetter;
+                                    break;
+                                default:
+                                    ll.NumberFormat = $"（%{level}）";
+                                    ll.NumberStyle = WdListNumberStyle.wdListNumberStyleLowercaseLetter;
+                                    break;
                             }
                             ll.TrailingCharacter = WdTrailingCharacter.wdTrailingTab;
+                            break;
+
+                        case HeadingNumberingScheme.NumericWithPeriod:
+                            ll.NumberFormat = $"{BuildNumberFormat(level)}.";
+                            ll.NumberStyle = WdListNumberStyle.wdListNumberStyleArabic;
+                            ll.TrailingCharacter = WdTrailingCharacter.wdTrailingSpace;
                             break;
                     }
 
@@ -520,24 +595,34 @@ namespace DocuFormatPro.Services
                     ll.TabPosition = 0;
                 }
 
-                // 对每个标题段落分别应用对应级别的列表
-                foreach (Paragraph para in doc.Paragraphs)
+                // 对每个标题段落：修正样式层级 + 应用对应级别的列表
+                foreach (var (para, styleLevel, level) in headingParagraphs)
                 {
                     try
                     {
-                        var styleName = ((Style)para.get_Style()).NameLocal;
-                        if (!headingStyleNames.Contains(styleName)) continue;
+                        // 层级与样式号不一致时（文字编号推断更可靠），把段落样式修正为对应层级的标题样式
+                        if (level != styleLevel)
+                        {
+                            try
+                            {
+                                para.Range.Font.Reset();
+                                object styleObj = doc.Styles[GetHeadingBuiltinStyle(level)];
+                                para.set_Style(ref styleObj);
+                                para.Format.LeftIndent = 0;
+                                para.Format.CharacterUnitLeftIndent = 0;
+                            }
+                            catch { }
+                        }
 
-                        // 根据样式名确定级别
-                        int headingLevel = GetHeadingLevelFromStyleName(styleName);
-                        if (headingLevel == 0) continue;
+                        // 先断开段落旧的多级列表归属，避免旧编号残留或新旧模板续接错乱
+                        try { para.Range.ListFormat.RemoveNumbers(WdNumberType.wdNumberParagraph); } catch { }
 
                         para.Range.ListFormat.ApplyListTemplateWithLevel(
                             lt,
                             ContinuePreviousList: true,
                             ApplyTo: WdListApplyTo.wdListApplyToWholeList,
                             DefaultListBehavior: WdDefaultListBehavior.wdWord10ListBehavior,
-                            ApplyLevel: headingLevel);
+                            ApplyLevel: Math.Min(level, 9));
                     }
                     catch { continue; }
                 }
@@ -548,25 +633,26 @@ namespace DocuFormatPro.Services
             catch { /* 多级列表创建失败，静默忽略 */ }
         }
 
+        private static WdBuiltinStyle GetHeadingBuiltinStyle(int level) => level switch
+        {
+            1 => WdBuiltinStyle.wdStyleHeading1,
+            2 => WdBuiltinStyle.wdStyleHeading2,
+            3 => WdBuiltinStyle.wdStyleHeading3,
+            4 => WdBuiltinStyle.wdStyleHeading4,
+            5 => WdBuiltinStyle.wdStyleHeading5,
+            6 => WdBuiltinStyle.wdStyleHeading6,
+            7 => WdBuiltinStyle.wdStyleHeading7,
+            8 => WdBuiltinStyle.wdStyleHeading8,
+            9 => WdBuiltinStyle.wdStyleHeading9,
+            _ => WdBuiltinStyle.wdStyleHeading3
+        };
+
         /// <summary>获取文档中对应级别的标题样式名称（中文或英文）</summary>
         private string GetHeadingStyleName(Document doc, int level)
         {
             try
             {
-                var builtinStyle = level switch
-                {
-                    1 => WdBuiltinStyle.wdStyleHeading1,
-                    2 => WdBuiltinStyle.wdStyleHeading2,
-                    3 => WdBuiltinStyle.wdStyleHeading3,
-                    4 => WdBuiltinStyle.wdStyleHeading4,
-                    5 => WdBuiltinStyle.wdStyleHeading5,
-                    6 => WdBuiltinStyle.wdStyleHeading6,
-                    7 => WdBuiltinStyle.wdStyleHeading7,
-                    8 => WdBuiltinStyle.wdStyleHeading8,
-                    9 => WdBuiltinStyle.wdStyleHeading9,
-                    _ => WdBuiltinStyle.wdStyleHeading3
-                };
-                return doc.Styles[builtinStyle].NameLocal;
+                return doc.Styles[GetHeadingBuiltinStyle(level)].NameLocal;
             }
             catch
             {
@@ -605,7 +691,14 @@ namespace DocuFormatPro.Services
 
                         para.Format.CharacterUnitFirstLineIndent = rule.Paragraph.FirstLineIndentChars;
                         para.Format.FirstLineIndent = 0;
-                        ApplyLineSpacing(para.Format, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue);
+                        para.Format.Alignment = rule.Paragraph.Alignment switch
+                        {
+                            TextAlignment.Center => WdParagraphAlignment.wdAlignParagraphCenter,
+                            TextAlignment.Right => WdParagraphAlignment.wdAlignParagraphRight,
+                            TextAlignment.Justify => WdParagraphAlignment.wdAlignParagraphJustify,
+                            _ => WdParagraphAlignment.wdAlignParagraphLeft
+                        };
+                        ApplyLineSpacing(para.Format, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue, rule.Paragraph.LineSpacingUnit);
                         para.Format.SpaceBefore = rule.Paragraph.SpaceBeforeLines * 12f;
                         para.Format.SpaceAfter = rule.Paragraph.SpaceAfterLines * 12f;
                     }
@@ -788,7 +881,7 @@ namespace DocuFormatPro.Services
                             // 段落：不缩进，水平居中，单元格垂直居中（默认）
                             cell.Range.ParagraphFormat.SpaceBefore = rule.Table.SpaceBeforeLines * 12f;
                             cell.Range.ParagraphFormat.SpaceAfter = rule.Table.SpaceAfterLines * 12f;
-                            ApplyLineSpacing(cell.Range.ParagraphFormat, LineSpacingType.Single, 1f);
+                            ApplyLineSpacing(cell.Range.ParagraphFormat, rule.Table.LineSpacingType, rule.Table.LineSpacingValue, rule.Table.LineSpacingUnit);
 
                             // 清除首行缩进（默认行为）
                             cell.Range.ParagraphFormat.FirstLineIndent = 0;
@@ -845,7 +938,7 @@ namespace DocuFormatPro.Services
             pf.CharacterUnitFirstLineIndent = 0;
             pf.LeftIndent = 0;
             pf.CharacterUnitLeftIndent = 0;
-            ApplyLineSpacing(pf, LineSpacingType.Single, 1f);
+            ApplyLineSpacing(pf, ts.LineSpacingType, ts.LineSpacingValue, ts.LineSpacingUnit);
 
             WdCellVerticalAlignment verticalAlignment = ts.CellVerticalAlignment switch
             {
@@ -1028,8 +1121,10 @@ namespace DocuFormatPro.Services
             shading.ForegroundPatternColor = fillColor;
         }
 
-        private void ApplyLineSpacing(ParagraphFormat pf, LineSpacingType type, float value)
+        private void ApplyLineSpacing(ParagraphFormat pf, LineSpacingType type, float value, LineSpacingUnit unit = LineSpacingUnit.Lines)
         {
+            unit = type == LineSpacingType.Multiple ? LineSpacingUnit.Lines
+                : (type == LineSpacingType.Fixed || type == LineSpacingType.AtLeast ? LineSpacingUnit.Points : unit);
             switch (type)
             {
                 case LineSpacingType.Single:
@@ -1042,16 +1137,24 @@ namespace DocuFormatPro.Services
                     pf.LineSpacingRule = WdLineSpacing.wdLineSpaceDouble;
                     break;
                 case LineSpacingType.Multiple:
-                    pf.LineSpacingRule = WdLineSpacing.wdLineSpaceMultiple;
-                    pf.LineSpacing = value * 12f; // Word 内部用 12pt 为 1 倍
+                    if (unit == LineSpacingUnit.Points)
+                    {
+                        pf.LineSpacingRule = WdLineSpacing.wdLineSpaceExactly;
+                        pf.LineSpacing = value;
+                    }
+                    else
+                    {
+                        pf.LineSpacingRule = WdLineSpacing.wdLineSpaceMultiple;
+                        pf.LineSpacing = value * 12f;
+                    }
                     break;
                 case LineSpacingType.Fixed:
                     pf.LineSpacingRule = WdLineSpacing.wdLineSpaceExactly;
-                    pf.LineSpacing = value; // 直接用磅值
+                    pf.LineSpacing = unit == LineSpacingUnit.Points ? value : value * 12f;
                     break;
                 case LineSpacingType.AtLeast:
                     pf.LineSpacingRule = WdLineSpacing.wdLineSpaceAtLeast;
-                    pf.LineSpacing = value;
+                    pf.LineSpacing = unit == LineSpacingUnit.Points ? value : value * 12f;
                     break;
             }
         }
@@ -1097,11 +1200,14 @@ namespace DocuFormatPro.Services
             XName hangingAttr = w + "hanging";
             XName hangingCharsAttr = w + "hangingChars";
 
-            foreach (XElement highlight in documentXml.Descendants(highlightName).ToList())
-                highlight.Remove();
+            if (rule.ClearTextBackground)
+            {
+                foreach (XElement highlight in documentXml.Descendants(highlightName).ToList())
+                    highlight.Remove();
 
-            foreach (XElement shading in documentXml.Descendants(shdName).ToList())
-                shading.Remove();
+                foreach (XElement shading in documentXml.Descendants(shdName).ToList())
+                    shading.Remove();
+            }
 
             var styleNames = BuildDocxStyleNameMap(archive, w);
             ApplyDocxParagraphFormatting(documentXml, w, styleNames, rule, normalizeBodyText);
@@ -1239,15 +1345,19 @@ namespace DocuFormatPro.Services
                 int headingLevel = GetHeadingLevelFromStyleName(styleName);
                 if (headingLevel > 0)
                 {
-                    var heading = ResolveHeadingFormat(rule, headingLevel);
-                    if (heading != null)
+                    if (rule.ApplyHeadingFormatting)
                     {
-                        ApplyParagraphProperties(pPr, w, heading.LineSpacingType, heading.LineSpacingValue,
-                            heading.SpaceBeforePoints, heading.SpaceAfterPoints, 0, spacingInPoints: true);
-                        ApplyRunsFormatting(paragraph.Elements(rName), w, heading.ChineseFontName, heading.EnglishFontName,
-                            heading.FontSizePoint, heading.IsBold,
-                            heading.UseCustomFontColor ? NormalizeHexColor(heading.FontColorHex) : "000000");
-                        ApplyQuotationFontOverrides(paragraph, w, heading.ChineseFontName);
+                        var heading = ResolveHeadingFormat(rule, headingLevel);
+                        if (heading != null)
+                        {
+                            ApplyParagraphProperties(pPr, w, heading.LineSpacingType, heading.LineSpacingValue, heading.LineSpacingUnit,
+                                heading.SpaceBeforePoints, heading.SpaceAfterPoints, 0, spacingInPoints: true,
+                                alignment: heading.Alignment);
+                            ApplyRunsFormatting(paragraph.Elements(rName), w, heading.ChineseFontName, heading.EnglishFontName,
+                                heading.FontSizePoint, heading.IsBold,
+                                heading.UseCustomFontColor ? NormalizeHexColor(heading.FontColorHex) : "000000");
+                            ApplyQuotationFontOverrides(paragraph, w, heading.ChineseFontName);
+                        }
                     }
 
                     continue;
@@ -1255,18 +1365,22 @@ namespace DocuFormatPro.Services
 
                 if (!IsBodyStyle(styleId, styleName)) continue;
 
-                ApplyParagraphProperties(pPr, w, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue,
-                    rule.Paragraph.SpaceBeforeLines, rule.Paragraph.SpaceAfterLines, rule.Paragraph.FirstLineIndentChars);
-                ApplyRunsFormatting(paragraph.Elements(rName), w, rule.BodyText.ChineseFontName, rule.BodyText.EnglishFontName,
-                    rule.BodyText.FontSizePoint, rule.BodyText.IsBold,
-                    rule.BodyText.UseCustomFontColor ? NormalizeHexColor(rule.BodyText.FontColorHex) : "000000");
+                if (rule.ApplyBodyFormatting)
+                {
+                    ApplyParagraphProperties(pPr, w, rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue, rule.Paragraph.LineSpacingUnit,
+                        rule.Paragraph.SpaceBeforeLines, rule.Paragraph.SpaceAfterLines, rule.Paragraph.FirstLineIndentChars,
+                        alignment: rule.Paragraph.Alignment);
+                    ApplyRunsFormatting(paragraph.Elements(rName), w, rule.BodyText.ChineseFontName, rule.BodyText.EnglishFontName,
+                        rule.BodyText.FontSizePoint, rule.BodyText.IsBold,
+                        rule.BodyText.UseCustomFontColor ? NormalizeHexColor(rule.BodyText.FontColorHex) : "000000");
+
+                    ApplyQuotationFontOverrides(paragraph, w, rule.BodyText.ChineseFontName);
+                }
 
                 if (normalizeBodyText)
                 {
                     NormalizeDocxParagraphText(paragraph, w);
                 }
-
-                ApplyQuotationFontOverrides(paragraph, w, rule.BodyText.ChineseFontName);
             }
         }
 
@@ -1332,12 +1446,17 @@ namespace DocuFormatPro.Services
             XNamespace w,
             LineSpacingType lineSpacingType,
             float lineSpacingValue,
+            LineSpacingUnit lineSpacingUnit,
             float spaceBeforeLines,
             float spaceAfterLines,
             float firstLineIndentChars,
-            bool spacingInPoints = false)
+            bool spacingInPoints = false,
+            TextAlignment alignment = TextAlignment.Left)
         {
+            lineSpacingUnit = lineSpacingType == LineSpacingType.Multiple ? LineSpacingUnit.Lines
+                : (lineSpacingType == LineSpacingType.Fixed || lineSpacingType == LineSpacingType.AtLeast ? LineSpacingUnit.Points : lineSpacingUnit);
             XName spacingName = w + "spacing";
+            XName valAttr = w + "val";
             XName indName = w + "ind";
             XName beforeAttr = w + "before";
             XName afterAttr = w + "after";
@@ -1352,6 +1471,15 @@ namespace DocuFormatPro.Services
             float spacingUnit = spacingInPoints ? 20f : 240f;
             spacing.SetAttributeValue(beforeAttr, Math.Max(0, (int)Math.Round(spaceBeforeLines * spacingUnit)));
             spacing.SetAttributeValue(afterAttr, Math.Max(0, (int)Math.Round(spaceAfterLines * spacingUnit)));
+
+            XElement jc = EnsureChild(pPr, w + "jc");
+            jc.SetAttributeValue(valAttr, alignment switch
+            {
+                TextAlignment.Center => "center",
+                TextAlignment.Right => "right",
+                TextAlignment.Justify => "both",
+                _ => "left"
+            });
 
             switch (lineSpacingType)
             {
@@ -1368,16 +1496,24 @@ namespace DocuFormatPro.Services
                     spacing.SetAttributeValue(lineRuleAttr, "auto");
                     break;
                 case LineSpacingType.Fixed:
-                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 20)));
+                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round((lineSpacingUnit == LineSpacingUnit.Points ? lineSpacingValue : lineSpacingValue * 12f) * 20)));
                     spacing.SetAttributeValue(lineRuleAttr, "exact");
                     break;
                 case LineSpacingType.AtLeast:
-                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 20)));
+                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round((lineSpacingUnit == LineSpacingUnit.Points ? lineSpacingValue : lineSpacingValue * 12f) * 20)));
                     spacing.SetAttributeValue(lineRuleAttr, "atLeast");
                     break;
                 default:
-                    spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 240)));
-                    spacing.SetAttributeValue(lineRuleAttr, "auto");
+                    if (lineSpacingUnit == LineSpacingUnit.Points)
+                    {
+                        spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 20)));
+                        spacing.SetAttributeValue(lineRuleAttr, "exact");
+                    }
+                    else
+                    {
+                        spacing.SetAttributeValue(lineAttr, Math.Max(0, (int)Math.Round(lineSpacingValue * 240)));
+                        spacing.SetAttributeValue(lineRuleAttr, "auto");
+                    }
                     break;
             }
 

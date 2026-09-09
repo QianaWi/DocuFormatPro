@@ -28,7 +28,8 @@ namespace DocuFormatPro.Views
             if (rule.BodyText.UseCustomFontColor)
                 AddItem(RulesPanel, $"字体颜色：{rule.BodyText.FontColorHex}");
             AddItem(RulesPanel, $"首行缩进：{rule.Paragraph.FirstLineIndentChars} 字符");
-            AddItem(RulesPanel, $"行距：{DescribeLineSpacing(rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue)}");
+            AddItem(RulesPanel, $"对齐方式：{DescribeAlignment(rule.Paragraph.Alignment)}");
+            AddItem(RulesPanel, $"行距：{DescribeLineSpacing(rule.Paragraph.LineSpacingType, rule.Paragraph.LineSpacingValue, rule.Paragraph.LineSpacingUnit)}");
             if (rule.Paragraph.SpaceBeforeLines > 0 || rule.Paragraph.SpaceAfterLines > 0)
                 AddItem(RulesPanel, $"段间距：段前 {rule.Paragraph.SpaceBeforeLines} 行，段后 {rule.Paragraph.SpaceAfterLines} 行");
 
@@ -39,7 +40,7 @@ namespace DocuFormatPro.Views
                 foreach (var h in rule.Headings)
                 {
                     string colorNote = h.UseCustomFontColor ? $"，颜色 {h.FontColorHex}" : "";
-                    AddItem(RulesPanel, $"标题 {h.Level}：{h.ChineseFontName}，{h.FontSizeName}，{DescribeAlignment(h.Alignment)}{(h.IsBold ? "，加粗" : "")}{colorNote}，段前 {h.SpaceBeforePoints}pt，段后 {h.SpaceAfterPoints}pt，行距 {DescribeLineSpacing(h.LineSpacingType, h.LineSpacingValue)}");
+                    AddItem(RulesPanel, $"标题 {h.Level}：{h.ChineseFontName}，{h.FontSizeName}，{DescribeAlignment(h.Alignment)}{(h.IsBold ? "，加粗" : "")}{colorNote}，段前 {h.SpaceBeforePoints}pt，段后 {h.SpaceAfterPoints}pt，行距 {DescribeLineSpacing(h.LineSpacingType, h.LineSpacingValue, h.LineSpacingUnit)}");
                 }
             }
 
@@ -48,7 +49,7 @@ namespace DocuFormatPro.Views
             if (rule.Table.ApplyTableFormatting)
             {
                 AddItem(RulesPanel, $"✅ 应用表格样式：{rule.Table.ChineseFontName} {rule.Table.FontSizeName}，{(rule.Table.HeaderBold ? "表头加粗" : "表头不加粗")}，{(rule.Table.RepeatHeaderRow ? "跨页重复表头" : "")}");
-                AddItem(RulesPanel, $"   行距：{DescribeLineSpacing(rule.Table.LineSpacingType, rule.Table.LineSpacingValue)}，边框：黑色单细线{(rule.Table.UseHeaderShading ? $"，首行底色 {rule.Table.HeaderShadingColorHex}" : "")}");
+                AddItem(RulesPanel, $"   行距：{DescribeLineSpacing(rule.Table.LineSpacingType, rule.Table.LineSpacingValue, rule.Table.LineSpacingUnit)}，边框：黑色单细线{(rule.Table.UseHeaderShading ? $"，首行底色 {rule.Table.HeaderShadingColorHex}" : "")}");
             }
             else
             {
@@ -70,7 +71,7 @@ namespace DocuFormatPro.Views
 
             // 始终执行的操作
             AddSectionTitle(RulesPanel, "🧹 始终执行");
-            AddItem(RulesPanel, "清除文字高亮和底纹背景色");
+            AddItem(RulesPanel, rule.ClearTextBackground ? "清除文字高亮和底纹背景色" : "保留原有文字高亮和底纹背景色");
         }
 
         private void AddSectionTitle(Panel parent, string text)
@@ -104,14 +105,14 @@ namespace DocuFormatPro.Views
             });
         }
 
-        private string DescribeLineSpacing(LineSpacingType type, float value) => type switch
+        private string DescribeLineSpacing(LineSpacingType type, float value, LineSpacingUnit unit) => type switch
         {
             LineSpacingType.Single => "单倍",
             LineSpacingType.OneAndHalf => "1.5 倍",
             LineSpacingType.Double => "双倍",
-            LineSpacingType.Multiple => $"多倍 {value}",
-            LineSpacingType.Fixed => $"固定值 {value}pt",
-            LineSpacingType.AtLeast => $"最小值 {value}pt",
+            LineSpacingType.Multiple => $"多倍 {value:0.##}{(unit == LineSpacingUnit.Points ? "pt" : "行")}",
+            LineSpacingType.Fixed => $"固定值 {value:0.##}{(unit == LineSpacingUnit.Points ? "pt" : "行")}",
+            LineSpacingType.AtLeast => $"最小值 {value:0.##}{(unit == LineSpacingUnit.Points ? "pt" : "行")}",
             _ => value.ToString()
         };
 

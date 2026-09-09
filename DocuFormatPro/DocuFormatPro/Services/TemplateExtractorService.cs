@@ -133,6 +133,13 @@ namespace DocuFormatPro.Services
 
                     // 段落格式
                     var pf = normalStyle.ParagraphFormat;
+                    rule.Paragraph.Alignment = pf.Alignment switch
+                    {
+                        WdParagraphAlignment.wdAlignParagraphCenter => TextAlignment.Center,
+                        WdParagraphAlignment.wdAlignParagraphRight => TextAlignment.Right,
+                        WdParagraphAlignment.wdAlignParagraphJustify => TextAlignment.Justify,
+                        _ => TextAlignment.Left
+                    };
                     if (pf.FirstLineIndent > 0)
                     {
                         // 将磅值转换为字符数（近似：1字符 ≈ 字号磅值）
@@ -255,10 +262,12 @@ namespace DocuFormatPro.Services
                         break;
                     case WdLineSpacing.wdLineSpaceExactly:
                         para.LineSpacingType = LineSpacingType.Fixed;
+                        para.LineSpacingUnit = LineSpacingUnit.Points;
                         para.LineSpacingValue = lineSpacing;
                         break;
                     case WdLineSpacing.wdLineSpaceAtLeast:
                         para.LineSpacingType = LineSpacingType.AtLeast;
+                        para.LineSpacingUnit = LineSpacingUnit.Points;
                         para.LineSpacingValue = lineSpacing;
                         break;
                 }

@@ -144,6 +144,16 @@ namespace DocuFormatPro
             }
         }
 
+        private void HeadingAlignment_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedIndex >= 0 && cb.Tag is string tag && int.TryParse(tag, out int level))
+            {
+                var heading = _viewModel.CurrentRule.Headings?.FirstOrDefault(h => h.Level == level);
+                if (heading != null)
+                    heading.AlignmentIndex = cb.SelectedIndex;
+            }
+        }
+
         private void HeadingNumberingScheme_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (sender is ComboBox cb && cb.SelectedIndex >= 0)
@@ -180,6 +190,24 @@ namespace DocuFormatPro
                     _ => LineSpacingType.Multiple
                 };
             }
+        }
+
+        private void BodyLineSpacingUnit_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedIndex >= 0)
+                _viewModel.CurrentRule.Paragraph.LineSpacingUnit = cb.SelectedIndex == 1 ? LineSpacingUnit.Points : LineSpacingUnit.Lines;
+        }
+
+        private void HeadingLineSpacingUnit_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedIndex >= 0 && cb.Tag is string tag && int.TryParse(tag, out int level))
+                _viewModel.SyncHeadingLineSpacingUnitByLevel(level, cb.SelectedIndex);
+        }
+
+        private void TableLineSpacingUnit_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ComboBox cb && cb.SelectedIndex >= 0)
+                _viewModel.CurrentRule.Table.LineSpacingUnit = cb.SelectedIndex == 1 ? LineSpacingUnit.Points : LineSpacingUnit.Lines;
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
