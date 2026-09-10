@@ -19,10 +19,10 @@ namespace DocuFormatPro.Models
         private FrontMatterSettings _frontMatter = new();
         private HeadingNumberingSettings _headingNumbering = new();
         private bool _normalizeBodyText = true;
-        private bool _clearTextBackground = true;
-        private bool _applyPageMargins = true;
-        private bool _applyBodyFormatting = true;
-        private bool _applyHeadingFormatting = true;
+        private bool _clearTextBackground = false;
+        private bool _applyPageMargins = false;
+        private bool _applyBodyFormatting = false;
+        private bool _applyHeadingFormatting = false;
 
         /// <summary>规则/模板名称</summary>
         public string RuleName
@@ -473,6 +473,7 @@ namespace DocuFormatPro.Models
     {
         private bool _enableNumbering = false;
         private bool _stripExistingNumbers = false;
+        private bool _promoteManualNumberedHeadings = false;
         private HeadingNumberingScheme _scheme = HeadingNumberingScheme.Numeric;
 
         /// <summary>是否启用标题自动编号</summary>
@@ -487,6 +488,13 @@ namespace DocuFormatPro.Models
         {
             get => _stripExistingNumbers;
             set { _stripExistingNumbers = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>是否自动将手动编号的正文段落提升为对应层级的标题样式</summary>
+        public bool PromoteManualNumberedHeadings
+        {
+            get => _promoteManualNumberedHeadings;
+            set { _promoteManualNumberedHeadings = value; OnPropertyChanged(); }
         }
 
         /// <summary>编号方案</summary>

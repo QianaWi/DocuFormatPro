@@ -160,6 +160,12 @@ namespace DocuFormatPro
                 _viewModel.SyncHeadingNumberingScheme(cb.SelectedIndex);
         }
 
+        private void About_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Views.AboutDialog { Owner = this };
+            dialog.ShowDialog();
+        }
+
         private void HeadingLineSpacingType_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (sender is ComboBox cb && cb.SelectedIndex >= 0 && cb.Tag is string tag)

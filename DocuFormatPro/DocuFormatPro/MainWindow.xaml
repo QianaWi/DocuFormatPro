@@ -117,12 +117,30 @@
                         <TextBlock Text="标题与编号" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
                         <TextBlock Text="表格与扩展" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
                     </StackPanel>
-                    <Border Grid.Row="2" Background="#223049" CornerRadius="8" Padding="10,11">
-                        <StackPanel>
-                            <TextBlock Text="处理提示" FontSize="10" Foreground="#7F8DA3" FontFamily="Microsoft YaHei UI"/>
-                            <TextBlock Text="拖入 Word 文件后开始配置" FontSize="11" Foreground="#D7E0ED" TextWrapping="Wrap" FontFamily="Microsoft YaHei UI" Margin="0,4,0,0"/>
-                        </StackPanel>
-                    </Border>
+                    <StackPanel Grid.Row="2">
+                        <Border Background="#223049" CornerRadius="8" Padding="10,11" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="处理提示" FontSize="10" Foreground="#7F8DA3" FontFamily="Microsoft YaHei UI"/>
+                                <TextBlock Text="拖入 Word 文件后开始配置" FontSize="11" Foreground="#D7E0ED" TextWrapping="Wrap" FontFamily="Microsoft YaHei UI" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Button Click="About_Click" Cursor="Hand" Background="#2A3953" Foreground="#B4C0D1"
+                                FontSize="11" FontFamily="Microsoft YaHei UI" Height="30" BorderThickness="0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="7">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#34445E"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <Button.Content>ⓘ  关于 DocuFormat Pro</Button.Content>
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -401,7 +419,8 @@
                                 <Separator Background="#E5E7EB" Margin="0,8,0,6"/>
                                 <CheckBox Content="启用标题自动编号" IsChecked="{Binding CurrentRule.HeadingNumbering.EnableNumbering}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.HeadingNumbering.EnableNumbering}">
-                                    <CheckBox Content="去除现有编号前缀后重新编号" IsChecked="{Binding CurrentRule.HeadingNumbering.StripExistingNumbers}" Style="{StaticResource RuleCheckBoxStyle}" Margin="0,2,0,4"/>
+                                    <CheckBox Content="去除现有编号前缀后重新编号" IsChecked="{Binding CurrentRule.HeadingNumbering.StripExistingNumbers}" Style="{StaticResource RuleCheckBoxStyle}" Margin="0,2,0,0"/>
+                                    <CheckBox Content="自动将手动编号段落提升为标题" IsChecked="{Binding CurrentRule.HeadingNumbering.PromoteManualNumberedHeadings}" Style="{StaticResource RuleCheckBoxStyle}" Margin="0,2,0,4"/>
                                     <TextBlock Text="编号方案" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
                                     <ComboBox ItemsSource="{Binding HeadingNumberingSchemes}"
                                               Style="{StaticResource RuleComboBoxStyle}"
@@ -458,9 +477,9 @@
                         </Border>
 
                         <!-- FRONT MATTER -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}">
+                        <Border Style="{StaticResource RuleGroupCardStyle}" IsEnabled="False" Opacity="0.5">
                             <StackPanel>
-                                <TextBlock Text="封面与前置页" Style="{StaticResource RuleGroupTitleStyle}"/>
+                                <TextBlock Text="封面与前置页（暂未开放）" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <CheckBox Content="启用前置页插入 (复制模板的前4页)" IsChecked="{Binding CurrentRule.FrontMatter.InsertFrontMatter}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.FrontMatter.InsertFrontMatter}">
                                     <TextBlock Text="前置页模板路径" FontSize="10.5" Foreground="#9CA3AF" Margin="0,4,0,3"/>

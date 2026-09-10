@@ -17,6 +17,9 @@ namespace DocuFormatPro.Services
     {
         private bool _disposed;
 
+        /// <summary>疑似编号输入异常的标题段落（如 9.1.1.8.2.1 .1，编号被空格分裂），保存前统一黄色高亮标记</summary>
+        private readonly List<Paragraph> _suspiciousNumberingParas = new();
+
         /// <summary>
         /// 异步处理单个 Word 文档
         /// </summary>
@@ -190,6 +193,9 @@ namespace DocuFormatPro.Services
                             ReportStepDone("前置页");
                             cancellationToken.ThrowIfCancellationRequested();
                         }
+
+                        // ===== 标记疑似编号异常（黄色高亮，供人工排查；须在清除背景步骤之后）=====
+                        MarkSuspiciousNumbering(progress);
 
                         // ===== 保存文档 =====
                         string directory = System.IO.Path.GetDirectoryName(filePath) ?? "";
@@ -451,6 +457,70 @@ namespace DocuFormatPro.Services
             return 0;
         }
 
+        /// <summary>
+        /// 判断正文段落是否为"手动编号的标题"：以数字链（至少两段）开头、编号后有空白分隔、
+        /// 整段较短（标题特征，≤60 字符）。level 输出编号段数即层级。
+        /// </summary>
+        private static bool IsManualNumberedHeading(string? text, out int level)
+        {
+            level = 0;
+            string t = (text ?? "").TrimStart();
+            if (t.Length == 0 || t.Length > 60) return false;
+
+            var m = Regex.Match(t, @"^(\d{1,3}(?:\.\d{1,3}){1,8})[\.、]?\s+");
+            if (!m.Success) return false;
+
+            string rest = t.Substring(m.Groups[1].Value.Length).TrimStart('.', ' ', '　');
+            if (rest.Length == 0) return false;
+
+            level = m.Groups[1].Value.Split('.').Length;
+            return level is >= 2 and <= 9;
+        }
+
+        /// <summary>提升手动编号标题时排除的样式：目录、题注</summary>
+        private static bool IsExcludedStyleForPromotion(string? styleName)
+        {
+            if (string.IsNullOrWhiteSpace(styleName)) return false;
+            string s = styleName.ToLowerInvariant();
+            return s.Contains("toc") || s.Contains("目录") || s.Contains("题注") || s.Contains("caption");
+        }
+
+        /// <summary>
+        /// 疑似编号输入异常：编号链与后续 ".数字" 之间被空格分裂（如 "9.1.1.8.2.1 .1 导入数据源"，
+        /// 本意是 9.1.1.8.2.1.1），或文字直接以 ".数字" 开头。不自动修正，仅黄色高亮供人工排查。
+        /// </summary>
+        private static bool HasSuspiciousNumbering(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            string t = text.TrimStart();
+            return Regex.IsMatch(t, @"^\d{1,3}(?:\.\d{1,3}){1,8}[\s　]+\.\d")
+                || Regex.IsMatch(t, @"^\.[\d１-９]");
+        }
+
+        /// <summary>保存前将疑似编号异常的标题段落标记为黄色高亮（须在"清除文字背景"步骤之后执行）</summary>
+        private void MarkSuspiciousNumbering(IProgress<string>? progress)
+        {
+            foreach (Paragraph para in _suspiciousNumberingParas)
+            {
+                try { para.Range.HighlightColorIndex = WdColorIndex.wdYellow; } catch { }
+            }
+
+            if (_suspiciousNumberingParas.Count > 0)
+                progress?.Report($"检测到 {_suspiciousNumberingParas.Count} 处疑似编号输入异常（黄色高亮标记），请人工核查");
+        }
+
+        private static bool IsParagraphInTable(Paragraph para)
+        {
+            try
+            {
+                return (bool)para.Range.Information[WdInformation.wdWithInTable];
+            }
+            catch
+            {
+                return true; // 无法判断时保守跳过，避免误提升表格内编号单元格
+            }
+        }
+
         private static int GetHeadingLevelFromStyleName(string? styleName)
         {
             if (string.IsNullOrWhiteSpace(styleName)) return 0;
@@ -461,13 +531,15 @@ namespace DocuFormatPro.Services
 
         private void ApplyHeadingNumbering(Document doc, HeadingNumberingSettings settings)
         {
+            _suspiciousNumberingParas.Clear();
+
             var headingStyleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "标题 1", "标题 2", "标题 3", "标题 4", "标题 5", "标题 6", "标题 7", "标题 8", "标题 9",
                 "Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5", "Heading 6", "Heading 7", "Heading 8", "Heading 9"
             };
 
-            // 一次遍历完成：收集标题段落 + 从文字编号推断层级 +（可选）剥离旧文字编号（推断之后写回）
+            // 一次遍历完成：收集标题段落 + 从文字编号推断层级 +（可选）提升手动编号段落 +（可选）剥离旧文字编号
             // 文字中的数字编号是最可靠的层级信号：样式号可能与实际层级跳档
             // （实测文档中 heading 9 的段落实为第 6 层，文字编号 9.1.1.1.4.1 共 6 段）
             var headingParagraphs = new List<(Paragraph Para, int StyleLevel, int Level)>();
@@ -482,9 +554,8 @@ namespace DocuFormatPro.Services
                 try
                 {
                     var styleName = ((Style)para.get_Style()).NameLocal;
-                    if (!headingStyleNames.Contains(styleName)) continue;
-                    int styleLevel = GetHeadingLevelFromStyleName(styleName);
-                    if (styleLevel == 0) continue;
+                    bool isHeading = headingStyleNames.Contains(styleName);
+                    if (!isHeading && !settings.PromoteManualNumberedHeadings) continue;
 
                     var r = para.Range;
                     object unit = WdUnits.wdCharacter;
@@ -492,8 +563,37 @@ namespace DocuFormatPro.Services
                     r.MoveEnd(ref unit, ref cnt);
                     string currentText = r.Text ?? "";
 
+                    int styleLevel;
+                    if (isHeading)
+                    {
+                        styleLevel = GetHeadingLevelFromStyleName(styleName);
+                        if (styleLevel == 0) continue;
+                    }
+                    else
+                    {
+                        // 将"手动编号 + 短文字"的正文段提升为对应层级的标题样式
+                        if (IsExcludedStyleForPromotion(styleName)
+                            || !IsManualNumberedHeading(currentText, out styleLevel)
+                            || IsParagraphInTable(para))
+                            continue;
+
+                        try
+                        {
+                            r.Font.Reset();
+                            object styleObj = doc.Styles[GetHeadingBuiltinStyle(styleLevel)];
+                            para.set_Style(ref styleObj);
+                            para.Format.LeftIndent = 0;
+                            para.Format.CharacterUnitLeftIndent = 0;
+                        }
+                        catch { continue; }
+                    }
+
                     int inferred = InferLevelFromHeadingText(currentText);
                     headingParagraphs.Add((para, styleLevel, inferred > 0 ? inferred : styleLevel));
+
+                    // 检测疑似编号输入异常（必须在 strip 剥离文字前判断）
+                    if (HasSuspiciousNumbering(currentText))
+                        _suspiciousNumberingParas.Add(para);
 
                     if (stripPattern != null)
                     {
@@ -593,6 +693,10 @@ namespace DocuFormatPro.Services
                     ll.NumberPosition = 0;
                     ll.TextPosition = 0;
                     ll.TabPosition = 0;
+
+                    // 链接对应标题样式：手动新建段落套用标题样式时编号自动按上下文续接
+                    // （不绑定时新段落会另起列表，从 1.1.1.1.1.1 重新开始）
+                    try { ll.LinkedStyle = GetHeadingStyleName(doc, level); } catch { }
                 }
 
                 // 对每个标题段落：修正样式层级 + 应用对应级别的列表
@@ -1202,8 +1306,10 @@ namespace DocuFormatPro.Services
 
             if (rule.ClearTextBackground)
             {
+                // 黄色高亮是"疑似编号异常"的警示标记，清除背景时保留
                 foreach (XElement highlight in documentXml.Descendants(highlightName).ToList())
-                    highlight.Remove();
+                    if (highlight.Attribute(valAttr)?.Value != "yellow")
+                        highlight.Remove();
 
                 foreach (XElement shading in documentXml.Descendants(shdName).ToList())
                     shading.Remove();
