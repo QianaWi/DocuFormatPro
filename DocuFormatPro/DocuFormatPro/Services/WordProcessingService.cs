@@ -105,9 +105,17 @@ namespace DocuFormatPro.Services
                         // ===== 3. 设置标题样式 =====
                         if (rule.ApplyHeadingFormatting)
                         {
-                            progress?.Report("正在设置标题格式...");
-                            ApplyHeadingStyles(doc, rule, resetDirectFormatting: !isDocxDocument);
-                            ReportStepDone("标题样式");
+                            if (rule.UseOriginalHeadingStyle)
+                            {
+                                progress?.Report("保持原文档标题样式...");
+                                ReportStepDone("标题样式（保持原样）");
+                            }
+                            else
+                            {
+                                progress?.Report("正在设置标题格式...");
+                                ApplyHeadingStyles(doc, rule, resetDirectFormatting: !isDocxDocument);
+                                ReportStepDone("标题样式");
+                            }
                             cancellationToken.ThrowIfCancellationRequested();
                         }
 
@@ -1024,10 +1032,17 @@ namespace DocuFormatPro.Services
             var tableRange = table.Range;
 
             tableRange.Font.Name = ts.ChineseFontName;
+            tableRange.Font.NameFarEast = ts.ChineseFontName;
+            tableRange.Font.NameOther = ts.ChineseFontName;
             tableRange.Font.NameAscii = ts.EnglishFontName;
             tableRange.Font.Size = ts.FontSizePoint;
             tableRange.Font.Bold = 0;
             tableRange.Font.Color = WdColor.wdColorBlack;
+
+            // 对整个表格 range 设置 NameAscii 会把中文引号渲染成英文字体，
+            // 与文本规范化中对引号单独设置的中文字体冲突。这里把引号类字符的
+            // 全部字体槽位恢复为中文字体。
+            TextNormalizationService.RestoreChineseQuotationFont(tableRange, ts.ChineseFontName);
 
             var pf = tableRange.ParagraphFormat;
             pf.Alignment = ts.CellHorizontalAlignment switch
@@ -1357,7 +1372,7 @@ namespace DocuFormatPro.Services
 
                     if (normalizeBodyText)
                     {
-                        NormalizeDocxParagraphText(paragraph, w);
+                        NormalizeDocxParagraphText(paragraph, w, rule.Table.ChineseFontName);
                     }
 
                     ApplyQuotationFontOverrides(paragraph, w, rule.Table.ChineseFontName);
@@ -1451,7 +1466,7 @@ namespace DocuFormatPro.Services
                 int headingLevel = GetHeadingLevelFromStyleName(styleName);
                 if (headingLevel > 0)
                 {
-                    if (rule.ApplyHeadingFormatting)
+                    if (rule.ApplyHeadingFormatting && !rule.UseOriginalHeadingStyle)
                     {
                         var heading = ResolveHeadingFormat(rule, headingLevel);
                         if (heading != null)
@@ -1485,12 +1500,12 @@ namespace DocuFormatPro.Services
 
                 if (normalizeBodyText)
                 {
-                    NormalizeDocxParagraphText(paragraph, w);
+                    NormalizeDocxParagraphText(paragraph, w, rule.BodyText.ChineseFontName);
                 }
             }
         }
 
-        private static void NormalizeDocxParagraphText(XElement paragraph, XNamespace w)
+        private static void NormalizeDocxParagraphText(XElement paragraph, XNamespace w, string chineseFontName)
         {
             XName rName = w + "r";
             XName tName = w + "t";
@@ -1502,7 +1517,8 @@ namespace DocuFormatPro.Services
             if (string.IsNullOrEmpty(original)) return;
 
             string normalized = TextNormalizationService.Normalize(original);
-            if (normalized == original) return;
+            bool hasChinesePunctuation = normalized.Any(IsChineseQuotationOrPunctuationChar);
+            if (normalized == original && !hasChinesePunctuation) return;
 
             XElement firstRun = runs[0];
             firstRun.Elements(tName).Remove();
@@ -1513,6 +1529,10 @@ namespace DocuFormatPro.Services
 
             foreach (XElement run in runs.Skip(1).ToList())
                 run.Remove();
+
+            // 合并后的文本统一使用正文中文字体，避免引号等中文标点被渲染成 Times New Roman
+            if (hasChinesePunctuation)
+                ApplyQuotationFontOverrides(paragraph, w, chineseFontName);
         }
 
         private static string GetDocxStyleName(string? styleId, Dictionary<string, string> styleNames)
@@ -1671,8 +1691,12 @@ namespace DocuFormatPro.Services
                 bool hasChineseQuotationOrPunctuation = ContainsChineseQuotationOrPunctuation(run.Value);
 
                 XElement rFonts = EnsureChild(rPr, rFontsName);
-                rFonts.SetAttributeValue(asciiAttr, englishFontName);
-                rFonts.SetAttributeValue(hAnsiAttr, englishFontName);
+                // 包含中文标点（引号、句号等）的 run，其所有字体槽位都跟随中文字体，
+                // 否则 Word 会用 ascii/hAnsi 槽位（Times New Roman）渲染全角引号，造成中西文混杂。
+                string asciiFont = hasChineseQuotationOrPunctuation ? chineseFontName : englishFontName;
+                string hAnsiFont = hasChineseQuotationOrPunctuation ? chineseFontName : englishFontName;
+                rFonts.SetAttributeValue(asciiAttr, asciiFont);
+                rFonts.SetAttributeValue(hAnsiAttr, hAnsiFont);
                 rFonts.SetAttributeValue(eastAsiaAttr, chineseFontName);
                 rFonts.SetAttributeValue(csAttr, hasChineseQuotationOrPunctuation ? chineseFontName : englishFontName);
 

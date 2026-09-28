@@ -60,7 +60,11 @@ namespace DocuFormatPro.Views
                 AddSectionTitle(RulesPanel, "📌 标题");
                 if (rule.ApplyHeadingFormatting)
                 {
-                    foreach (var h in rule.Headings ?? Enumerable.Empty<HeadingStyle>())
+                    if (rule.UseOriginalHeadingStyle)
+                    {
+                        AddItem(RulesPanel, "仅保持原文档标题样式，不应用下方自定义参数", "#9CA3AF");
+                    }
+                    else foreach (var h in rule.Headings ?? Enumerable.Empty<HeadingStyle>())
                     {
                         string colorNote = h.UseCustomFontColor ? $"，颜色 {h.FontColorHex}" : "";
                         AddItem(RulesPanel, $"标题 {h.Level}：{h.ChineseFontName}，{h.FontSizeName}，{DescribeAlignment(h.Alignment)}{(h.IsBold ? "，加粗" : "")}{colorNote}，段前 {h.SpaceBeforePoints}pt，段后 {h.SpaceAfterPoints}pt，行距 {DescribeLineSpacing(h.LineSpacingType, h.LineSpacingValue, h.LineSpacingUnit)}");

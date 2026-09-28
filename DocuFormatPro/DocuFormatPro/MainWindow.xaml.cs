@@ -216,6 +216,37 @@ namespace DocuFormatPro
                 _viewModel.CurrentRule.Table.LineSpacingUnit = cb.SelectedIndex == 1 ? LineSpacingUnit.Points : LineSpacingUnit.Lines;
         }
 
+        private static readonly System.Windows.Style NavActiveStyle =
+            (System.Windows.Style)Application.Current.FindResource("NavButtonActiveStyle");
+        private static readonly System.Windows.Style NavInactiveStyle =
+            (System.Windows.Style)Application.Current.FindResource("NavButtonStyle");
+
+        private void NavPage_Click(object sender, RoutedEventArgs e) => NavigateToSection(ExpPage, NavPage);
+        private void NavBody_Click(object sender, RoutedEventArgs e) => NavigateToSection(ExpBodyText, NavBody);
+        private void NavHeading_Click(object sender, RoutedEventArgs e) => NavigateToSection(ExpHeadings, NavHeading);
+        private void NavTable_Click(object sender, RoutedEventArgs e) => NavigateToSection(ExpTable, NavTable);
+
+        private void NavigateToSection(Expander expander, Button activeButton)
+        {
+            foreach (var ex in new[] { ExpPage, ExpBodyText, ExpParagraph, ExpHeadings, ExpTable, ExpFrontMatter, ExpTemplate })
+                ex.IsExpanded = ex == expander;
+
+            foreach (Button btn in new[] { NavPage, NavBody, NavHeading, NavTable })
+                btn.Style = ReferenceEquals(btn, activeButton) ? NavActiveStyle : NavInactiveStyle;
+
+            UpdateLayout();
+            expander.BringIntoView();
+        }
+
+        private void UseOriginalHeadingStyle_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            _viewModel.CurrentRule.UseOriginalHeadingStyle = true;
+        }
+
+        private void UseCustomHeadingStyle_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            _viewModel.CurrentRule.UseOriginalHeadingStyle = false;
+        }
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             _viewModel.Cleanup();

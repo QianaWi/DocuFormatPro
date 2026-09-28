@@ -15,6 +15,10 @@
         <converters:FileSizeConverter x:Key="FileSizeConverter"/>
         <converters:BoolToVisibilityConverter x:Key="BoolToVis"/>
         <converters:CountToVisibilityConverter x:Key="CountToVis"/>
+        <converters:InverseBoolConverter x:Key="InverseBool"/>
+        <converters:StringEqualsConverter x:Key="StringEquals"/>
+        <converters:HexColorToBrushConverter x:Key="HexToBrush"/>
+        <converters:BoolToOpacityConverter x:Key="BoolToOpacity"/>
     </Window.Resources>
 
     <Grid>
@@ -93,31 +97,12 @@
                         <TextBlock Text="排版控制台" FontSize="16" Foreground="White" FontWeight="SemiBold" FontFamily="Microsoft YaHei UI" Margin="0,4,0,0"/>
                     </StackPanel>
                     <StackPanel Grid.Row="1" Margin="0,24,0,0">
-                        <Border Background="#2A3953" CornerRadius="7" Padding="10,11" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="01" FontSize="10" Foreground="#2DD4BF" FontWeight="Bold" FontFamily="Segoe UI" Width="28"/>
-                                <TextBlock Text="排版规则" FontSize="12" Foreground="White" FontWeight="SemiBold" FontFamily="Microsoft YaHei UI"/>
-                            </StackPanel>
-                        </Border>
-                        <Border Padding="10,11" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="02" FontSize="10" Foreground="#71819A" FontWeight="Bold" FontFamily="Segoe UI" Width="28"/>
-                                <TextBlock Text="文件队列" FontSize="12" Foreground="#B4C0D1" FontFamily="Microsoft YaHei UI"/>
-                            </StackPanel>
-                        </Border>
-                        <Border Padding="10,11" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="03" FontSize="10" Foreground="#71819A" FontWeight="Bold" FontFamily="Segoe UI" Width="28"/>
-                                <TextBlock Text="处理结果" FontSize="12" Foreground="#B4C0D1" FontFamily="Microsoft YaHei UI"/>
-                            </StackPanel>
-                        </Border>
-                        <Separator Background="#34445E" Margin="10,10,10,12"/>
-                        <TextBlock Text="页面设置" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
-                        <TextBlock Text="字体与段落" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
-                        <TextBlock Text="标题与编号" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
-                        <TextBlock Text="表格与扩展" FontSize="11" Foreground="#71819A" FontFamily="Microsoft YaHei UI" Margin="10,0,0,10"/>
-                    </StackPanel>
-                    <StackPanel Grid.Row="2">
+                        <TextBlock Text="规则配置" FontSize="11" Foreground="#7F8DA3" FontWeight="SemiBold" FontFamily="Microsoft YaHei UI" Margin="4,0,0,8"/>
+                        <Button x:Name="NavPage" Style="{StaticResource NavButtonActiveStyle}" Click="NavPage_Click" Content="页面设置"/>
+                        <Button x:Name="NavBody" Style="{StaticResource NavButtonStyle}" Click="NavBody_Click" Content="字体与段落"/>
+                        <Button x:Name="NavHeading" Style="{StaticResource NavButtonStyle}" Click="NavHeading_Click" Content="标题与编号"/>
+                        <Button x:Name="NavTable" Style="{StaticResource NavButtonStyle}" Click="NavTable_Click" Content="表格格式"/>
+                    </StackPanel><StackPanel Grid.Row="2">
                         <Border Background="#223049" CornerRadius="8" Padding="10,11" Margin="0,0,0,8">
                             <StackPanel>
                                 <TextBlock Text="处理提示" FontSize="10" Foreground="#7F8DA3" FontFamily="Microsoft YaHei UI"/>
@@ -173,9 +158,8 @@
                         </StackPanel>
 
                         <!-- PAGE MARGINS -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}">
+                        <Expander x:Name="ExpPage" Style="{StaticResource RuleSectionExpanderStyle}" Header="页面设置" IsExpanded="True">
                             <StackPanel>
-                                <TextBlock Text="页面设置" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <CheckBox Content="应用页面设置" IsChecked="{Binding CurrentRule.ApplyPageMargins}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.ApplyPageMargins}">
                                 <UniformGrid Columns="2" Margin="0,0,0,0">
@@ -198,12 +182,11 @@
                                 </UniformGrid>
                                 </StackPanel>
                             </StackPanel>
-                        </Border>
+                        </Expander>
 
                         <!-- BODY TEXT -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}">
+                        <Expander x:Name="ExpBodyText" Style="{StaticResource RuleSectionExpanderStyle}" Header="正文格式" IsExpanded="False">
                             <StackPanel>
-                                <TextBlock Text="正文格式" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <CheckBox Content="应用正文格式" IsChecked="{Binding CurrentRule.ApplyBodyFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.ApplyBodyFormatting}">
                                 <TextBlock Text="中文字体" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
@@ -230,12 +213,11 @@
                                 <CheckBox Content="规范化文本（去除中英文空格、英文标点转中文）" IsChecked="{Binding CurrentRule.NormalizeBodyText}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <CheckBox Content="清除文字高亮和底纹背景色" IsChecked="{Binding CurrentRule.ClearTextBackground}" Style="{StaticResource RuleCheckBoxStyle}" Margin="0,5,0,0"/>
                             </StackPanel>
-                        </Border>
+                        </Expander>
 
                         <!-- PARAGRAPH -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}">
+                        <Expander x:Name="ExpParagraph" Style="{StaticResource RuleSectionExpanderStyle}" Header="段落格式" IsExpanded="False">
                             <StackPanel>
-                                <TextBlock Text="段落格式" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <CheckBox Content="应用正文格式" IsChecked="{Binding CurrentRule.ApplyBodyFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.ApplyBodyFormatting}">
                                 <TextBlock Text="首行缩进 (字符)" FontSize="10.5" Foreground="#9CA3AF" Margin="0,0,0,3"/>
@@ -268,14 +250,55 @@
                                 </UniformGrid>
                                 </StackPanel>
                             </StackPanel>
-                        </Border>
+                        </Expander>
 
                         <!-- HEADINGS -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}">
+                        <Expander x:Name="ExpHeadings" Style="{StaticResource RuleSectionExpanderStyle}" Header="标题格式" IsExpanded="False">
                             <StackPanel>
-                                <TextBlock Text="标题格式" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <CheckBox Content="应用标题样式" IsChecked="{Binding CurrentRule.ApplyHeadingFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.ApplyHeadingFormatting}">
+                                                                <UniformGrid Columns="2" Margin="0,0,0,8">
+                                    <Border Margin="0,0,4,0" Cursor="Hand" MouseLeftButtonUp="UseOriginalHeadingStyle_Click">
+                                        <Border.Style>
+                                            <Style TargetType="Border" BasedOn="{StaticResource ModeCardStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CurrentRule.UseOriginalHeadingStyle}" Value="True">
+                                                        <Setter Property="Background" Value="#EEF0FF"/>
+                                                        <Setter Property="BorderBrush" Value="#6C63FF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="📄" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <StackPanel>
+                                                <TextBlock Text="使用原文档标题样式" FontSize="11.5" Foreground="#1A1A2E" FontFamily="Microsoft YaHei UI"/>
+                                                <TextBlock Text="保留文档原有字体、字号与格式" FontSize="9.5" Foreground="#9CA3AF" FontFamily="Microsoft YaHei UI"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Margin="4,0,0,0" Cursor="Hand" MouseLeftButtonUp="UseCustomHeadingStyle_Click">
+                                        <Border.Style>
+                                            <Style TargetType="Border" BasedOn="{StaticResource ModeCardStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CurrentRule.UseOriginalHeadingStyle}" Value="False">
+                                                        <Setter Property="Background" Value="#EEF0FF"/>
+                                                        <Setter Property="BorderBrush" Value="#6C63FF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="⚙️" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <StackPanel>
+                                                <TextBlock Text="使用自定义参数" FontSize="11.5" Foreground="#1A1A2E" FontFamily="Microsoft YaHei UI"/>
+                                                <TextBlock Text="按下方字体、字号、行距等参数设置" FontSize="9.5" Foreground="#9CA3AF" FontFamily="Microsoft YaHei UI"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+                                </StackPanel>
+                                <StackPanel IsEnabled="{Binding CurrentRule.UseOriginalHeadingStyle, Converter={StaticResource InverseBool}}">
                                 <!-- 列标题 -->
                                 <Grid Margin="0,4,0,4">
                                     <Grid.ColumnDefinitions>
@@ -427,13 +450,12 @@
                                               SelectedIndex="{Binding CurrentRule.HeadingNumbering.SchemeIndex}"
                                               SelectionChanged="HeadingNumberingScheme_Changed"/>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
+                                </StackPanel>
+                        </Expander>
 
                         <!-- TABLE -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}">
+                        <Expander x:Name="ExpTable" Style="{StaticResource RuleSectionExpanderStyle}" Header="表格格式" IsExpanded="False">
                             <StackPanel>
-                                <TextBlock Text="表格格式" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <CheckBox Content="应用表格样式" IsChecked="{Binding CurrentRule.Table.ApplyTableFormatting}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <CheckBox Content="自动处理题注编号" IsChecked="{Binding CurrentRule.Table.ApplyTableCaptions}" Style="{StaticResource RuleCheckBoxStyle}"/>
                                 <StackPanel IsEnabled="{Binding CurrentRule.Table.ApplyTableFormatting}">
@@ -454,6 +476,9 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                         <CheckBox Content="首行底色" IsChecked="{Binding CurrentRule.Table.UseHeaderShading}" Style="{StaticResource RuleCheckBoxStyle}" VerticalAlignment="Center"/>
                                         <TextBox Text="{Binding CurrentRule.Table.HeaderShadingColorHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RuleTextBoxStyle}" Width="75" Margin="8,0,0,0" IsEnabled="{Binding CurrentRule.Table.UseHeaderShading}" VerticalAlignment="Center"/>
+                                        <Border Width="24" Height="24" CornerRadius="5" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="首行底色预览"
+                                              BorderBrush="#D1D5DB" BorderThickness="1"
+                                              Background="{Binding CurrentRule.Table.HeaderShadingColorHex, Converter={StaticResource HexToBrush}}" Opacity="{Binding CurrentRule.Table.UseHeaderShading, Converter={StaticResource BoolToOpacity}}"/>
                                     </StackPanel>
                                     <!-- 固定默认项 -->
                                     <CheckBox Content="表头加粗" IsChecked="{Binding CurrentRule.Table.HeaderBold}" Style="{StaticResource RuleCheckBoxStyle}" IsEnabled="False" Margin="0,4,0,0"/>
@@ -474,10 +499,10 @@
                                     </UniformGrid>
                                 </StackPanel>
                             </StackPanel>
-                        </Border>
+                        </Expander>
 
                         <!-- FRONT MATTER -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}" IsEnabled="False" Opacity="0.5">
+                        <Expander x:Name="ExpFrontMatter" Style="{StaticResource RuleSectionExpanderStyle}" Header="封面与前置页（暂未开放）" IsExpanded="False" IsEnabled="False" Opacity="0.5">
                             <StackPanel>
                                 <TextBlock Text="封面与前置页（暂未开放）" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <CheckBox Content="启用前置页插入 (复制模板的前4页)" IsChecked="{Binding CurrentRule.FrontMatter.InsertFrontMatter}" Style="{StaticResource RuleCheckBoxStyle}"/>
@@ -493,10 +518,10 @@
                                     </Grid>
                                 </StackPanel>
                             </StackPanel>
-                        </Border>
+                        </Expander>
 
                         <!-- TEMPLATE ACTIONS -->
-                        <Border Style="{StaticResource RuleGroupCardStyle}" IsEnabled="False" Opacity="0.5">
+                        <Expander x:Name="ExpTemplate" Style="{StaticResource RuleSectionExpanderStyle}" Header="模板管理（暂未开放）" IsExpanded="False" IsEnabled="False" Opacity="0.5">
                             <StackPanel>
                                 <TextBlock Text="模板管理（暂未开放）" Style="{StaticResource RuleGroupTitleStyle}"/>
                                 <Button Content="📥 从文档提取模板" Style="{StaticResource SmallPrimaryButtonStyle}" Background="#6C63FF" Command="{Binding ImportTemplateCommand}" Margin="0,0,0,6" HorizontalAlignment="Stretch"/>
@@ -511,7 +536,7 @@
                                     <Button Content="🗑 删除" Style="{StaticResource SmallOutlineButtonStyle}" Foreground="#F44336" BorderBrush="#F44336" Command="{Binding DeleteRuleCommand}" Margin="4,0,0,0"/>
                                 </UniformGrid>
                             </StackPanel>
-                        </Border>
+                        </Expander>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -614,11 +639,17 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <ProgressBar Value="{Binding ProgressValue}" Maximum="100" Style="{StaticResource ModernProgressBarStyle}" Margin="0,0,0,10"/>
-                <TextBlock Grid.Row="1" Text="{Binding StatusText}" FontSize="12" Foreground="#6B7280" FontFamily="Microsoft YaHei UI" Margin="0,0,0,12"/>
-                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{Binding CurrentRule.SummaryText}" FontSize="11" Foreground="#6C63FF" FontFamily="Microsoft YaHei UI" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentRule.SummaryText}"/>
+                        <TextBlock Text="{Binding StatusText}" FontSize="11.5" Foreground="#6B7280" FontFamily="Microsoft YaHei UI" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="清空列表" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ClearListCommand}" Margin="0,0,10,0"
                             Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
                     <Button Content="取消任务" Style="{StaticResource SecondaryButtonStyle}" Foreground="#F44336" BorderBrush="#F44336" Command="{Binding CancelCommand}" Margin="0,0,10,0"
@@ -629,7 +660,9 @@
                             <TextBlock Text="开始排版" VerticalAlignment="Center" FontFamily="Microsoft YaHei UI"/>
                         </StackPanel>
                     </Button>
-                </StackPanel>
+                    </StackPanel>
+                </Grid>
+                <ProgressBar Grid.Row="1" Value="{Binding ProgressValue}" Maximum="100" Style="{StaticResource ModernProgressBarStyle}" Margin="0,10,0,0"/>
             </Grid>
         </Border>
     </Grid>

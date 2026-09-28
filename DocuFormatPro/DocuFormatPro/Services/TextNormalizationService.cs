@@ -215,6 +215,15 @@ namespace DocuFormatPro.Services
             }
         }
 
+        /// <summary>
+        /// 将 range 内中文引号/标点的所有字体槽位恢复为指定中文字体，
+        /// 抵消对整个 range 设置 NameAscii 带来的引号英文字体问题。
+        /// </summary>
+        public static void RestoreChineseQuotationFont(Microsoft.Office.Interop.Word.Range range, string chineseFontName)
+        {
+            ApplyChineseFontToTargetCharacters(range, chineseFontName);
+        }
+
         private static void ApplyChineseFontToTargetCharacters(Microsoft.Office.Interop.Word.Range range, string chineseFontName)
         {
             try

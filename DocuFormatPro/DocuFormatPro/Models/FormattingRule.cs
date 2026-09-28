@@ -23,6 +23,8 @@ namespace DocuFormatPro.Models
         private bool _applyPageMargins = false;
         private bool _applyBodyFormatting = false;
         private bool _applyHeadingFormatting = false;
+        // Preserve source heading styles when enabled; false keeps the historical behavior.
+        private bool _useOriginalHeadingStyle = false;
 
         /// <summary>规则/模板名称</summary>
         public string RuleName
@@ -35,14 +37,26 @@ namespace DocuFormatPro.Models
         public PageMarginSettings PageMargins
         {
             get => _pageMargins;
-            set { _pageMargins = value; OnPropertyChanged(); }
+            set
+            {
+                if (_pageMargins != null) _pageMargins.PropertyChanged -= SubSetting_PropertyChanged;
+                _pageMargins = value;
+                if (_pageMargins != null) _pageMargins.PropertyChanged += SubSetting_PropertyChanged;
+                OnPropertyChanged();
+            }
         }
 
         /// <summary>正文字体设置</summary>
         public BodyTextSettings BodyText
         {
             get => _bodyText;
-            set { _bodyText = value; OnPropertyChanged(); }
+            set
+            {
+                if (_bodyText != null) _bodyText.PropertyChanged -= SubSetting_PropertyChanged;
+                _bodyText = value;
+                if (_bodyText != null) _bodyText.PropertyChanged += SubSetting_PropertyChanged;
+                OnPropertyChanged();
+            }
         }
 
         /// <summary>段落格式设置</summary>
@@ -56,14 +70,34 @@ namespace DocuFormatPro.Models
         public TableSettings Table
         {
             get => _table;
-            set { _table = value; OnPropertyChanged(); }
+            set
+            {
+                if (_table != null) _table.PropertyChanged -= SubSetting_PropertyChanged;
+                _table = value;
+                if (_table != null) _table.PropertyChanged += SubSetting_PropertyChanged;
+                OnPropertyChanged();
+            }
         }
 
         /// <summary>标题样式列表 (标题1~N)</summary>
         public List<HeadingStyle> Headings
         {
             get => _headings;
-            set { _headings = value; OnPropertyChanged(); }
+            set
+            {
+                foreach (var h in _headings) h.PropertyChanged -= Heading_PropertyChanged;
+                _headings = value ?? new List<HeadingStyle>();
+                foreach (var h in _headings) h.PropertyChanged += Heading_PropertyChanged;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SummaryText));
+                OnPropertyChanged(nameof(HeadingSummaryText));
+            }
+        }
+
+        private void Heading_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            OnPropertyChanged(nameof(SummaryText));
+            OnPropertyChanged(nameof(HeadingSummaryText));
         }
 
         /// <summary>前置页设置</summary>
@@ -84,34 +118,88 @@ namespace DocuFormatPro.Models
         public bool NormalizeBodyText
         {
             get => _normalizeBodyText;
-            set { _normalizeBodyText = value; OnPropertyChanged(); }
+            set { _normalizeBodyText = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); }
         }
 
         public bool ClearTextBackground
         {
             get => _clearTextBackground;
-            set { _clearTextBackground = value; OnPropertyChanged(); }
+            set { _clearTextBackground = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); }
         }
 
         /// <summary>是否应用页面边距</summary>
         public bool ApplyPageMargins
         {
             get => _applyPageMargins;
-            set { _applyPageMargins = value; OnPropertyChanged(); }
+            set { _applyPageMargins = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); OnPropertyChanged(nameof(PageSummaryText)); }
         }
 
         /// <summary>是否应用正文格式（字体+段落）</summary>
         public bool ApplyBodyFormatting
         {
             get => _applyBodyFormatting;
-            set { _applyBodyFormatting = value; OnPropertyChanged(); }
+            set { _applyBodyFormatting = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); OnPropertyChanged(nameof(BodySummaryText)); }
         }
 
         /// <summary>是否应用标题样式（不含自动编号）</summary>
         public bool ApplyHeadingFormatting
         {
             get => _applyHeadingFormatting;
-            set { _applyHeadingFormatting = value; OnPropertyChanged(); }
+            set { _applyHeadingFormatting = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); OnPropertyChanged(nameof(HeadingSummaryText)); }
+        }
+
+        /// <summary>Whether to preserve the source document's heading styles instead of applying configured values.</summary>
+        public bool UseOriginalHeadingStyle
+        {
+            get => _useOriginalHeadingStyle;
+            set { _useOriginalHeadingStyle = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); OnPropertyChanged(nameof(HeadingSummaryText)); }
+        }
+
+        [JsonIgnore]
+        public string PageSummaryText => ApplyPageMargins
+            ? $"已启用 · 上下 {PageMargins.TopMargin:0.##}/{PageMargins.BottomMargin:0.##}cm"
+            : "使用原文档";
+
+        [JsonIgnore]
+        public string BodySummaryText => ApplyBodyFormatting
+            ? $"已启用 · {BodyText.ChineseFontName} {BodyText.FontSizeName}"
+            : "使用原文档";
+
+        [JsonIgnore]
+        public string HeadingSummaryText => !ApplyHeadingFormatting
+            ? "使用原文档"
+            : UseOriginalHeadingStyle
+                ? "保留原文档样式"
+                : $"自定义 · {Headings.FirstOrDefault()?.ChineseFontName} {Headings.FirstOrDefault()?.FontSizeName}";
+
+        [JsonIgnore]
+        public string TableSummaryText => Table.ApplyTableFormatting
+            ? $"已启用 · {Table.ChineseFontName} {Table.FontSizeName}"
+            : "使用原文档";
+
+        /// <summary>底部操作栏使用的规则摘要</summary>
+        [JsonIgnore]
+        public string SummaryText
+        {
+            get
+            {
+                var parts = new List<string>();
+                parts.Add(ApplyPageMargins
+                    ? $"页边距 {PageMargins.TopMargin:0.##}/{PageMargins.BottomMargin:0.##}/{PageMargins.LeftMargin:0.##}/{PageMargins.RightMargin:0.##}cm"
+                    : "页边距 原文档");
+                parts.Add(ApplyBodyFormatting
+                    ? $"正文 {BodyText.ChineseFontName} {BodyText.FontSizeName}"
+                    : "正文 原文档");
+                parts.Add(!ApplyHeadingFormatting
+                    ? "标题 原文档"
+                    : UseOriginalHeadingStyle
+                        ? "标题 保留原文档样式"
+                        : $"标题 自定义 · {Headings.FirstOrDefault()?.ChineseFontName} {Headings.FirstOrDefault()?.FontSizeName}");
+                parts.Add(Table.ApplyTableFormatting ? $"表格 {Table.ChineseFontName} {Table.FontSizeName}" : "表格 原文档");
+                if (NormalizeBodyText) parts.Add("文本规范化");
+                if (ClearTextBackground) parts.Add("清除背景色");
+                return string.Join("   ·   ", parts);
+            }
         }
 
         /// <summary>
@@ -216,6 +304,14 @@ namespace DocuFormatPro.Models
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        private void SubSetting_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            OnPropertyChanged(nameof(SummaryText));
+            OnPropertyChanged(nameof(PageSummaryText));
+            OnPropertyChanged(nameof(BodySummaryText));
+            OnPropertyChanged(nameof(HeadingSummaryText));
+            OnPropertyChanged(nameof(TableSummaryText));
+        }
     }
 
     #region 子设置类

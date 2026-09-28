@@ -165,6 +165,24 @@ namespace DocuFormatPro.Converters
     }
 
     /// <summary>
+    /// <summary>bool → Opacity（true=1，false=0.35），用于颜色预览在禁用时的淡化</summary>
+    public class BoolToOpacityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is true ? 1.0 : 0.35;
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => Binding.DoNothing;
+    }
+    /// <summary>字符串相等比较 → bool，用于模式卡片/导航的选中态显示</summary>
+    public class StringEqualsConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => string.Equals(value as string, parameter as string, StringComparison.OrdinalIgnoreCase);
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => Binding.DoNothing;
+    }
     /// 十六进制颜色字符串（#RRGGBB）→ SolidColorBrush 转换器，用于颜色预览色块
     /// </summary>
     public class HexColorToBrushConverter : IValueConverter
